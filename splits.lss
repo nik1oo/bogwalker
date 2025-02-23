@@ -1,0 +1,88 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Run version="1.7.0">
+  <GameIcon><![CDATA[AAEAAAD/////AQAAAAAAAAAMAgAAAFFTeXN0ZW0uRHJhd2luZywgVmVyc2lvbj00LjAuMC4wLCBDdWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPWIwM2Y1ZjdmMTFkNTBhM2EFAQAAABVTeXN0ZW0uRHJhd2luZy5CaXRtYXABAAAABERhdGEHAgIAAAAJAwAAAA8DAAAATwEAAAKJUE5HDQoaCgAAAA1JSERSAAAAIAAAACAIBgAAAHN6evQAAAAEZ0FNQQAAsY8L/GEFAAAACXBIWXMAAAsOAAALDgFAvuFBAAAA8UlEQVRYR82VUQ6DIBBE+ekBeoEeosftSeuPNtsEszxWRBaIk8wHRGYeSDSENm2Gp4nFUyFYaHmYWFRydyUFn2fYllfYvsp8hgFe7cFSLGahNccQj/bQuHuWWXMM8eg+APEVWJ4CICfwfuSW+WkAGiKOR55AVq4hNMCoUzgFGHkPkjALgBexJ0Sx/BYAPP6eEFXltwbwQJjlEsjy6QCEWNf1bxYXIKqUAegPDmFYSHcBoGsBmMWiIyWLuPuzUm1Z6wZg+RWIoQC1EEMBaiDcAPzvH5nF3QFqLCB6zCwWlcSFPXxZDPC4WQxqsVsMvOJT/QBdJRK8UPFkEwAAAABJRU5ErkJgggs=]]></GameIcon>
+  <GameName>Bogwalker</GameName>
+  <CategoryName>
+  </CategoryName>
+  <LayoutPath>
+  </LayoutPath>
+  <Metadata>
+    <Run id="" />
+    <Platform usesEmulator="False">
+    </Platform>
+    <Region>
+    </Region>
+    <Variables />
+  </Metadata>
+  <Offset>00:00:00</Offset>
+  <AttemptCount>40</AttemptCount>
+  <AttemptHistory>
+    <Attempt id="1" started="12/08/2024 15:17:36" isStartedSynced="True" ended="12/08/2024 15:17:53" isEndedSynced="True">
+      <PauseTime>00:00:03.6910156</PauseTime>
+    </Attempt>
+    <Attempt id="2" started="12/08/2024 15:17:56" isStartedSynced="True" ended="12/08/2024 15:18:10" isEndedSynced="True" />
+    <Attempt id="3" started="12/08/2024 15:18:15" isStartedSynced="True" ended="12/09/2024 01:17:43" isEndedSynced="True">
+      <PauseTime>08:40:52.4527898</PauseTime>
+    </Attempt>
+    <Attempt id="4" started="12/10/2024 11:46:19" isStartedSynced="True" ended="12/10/2024 14:51:53" isEndedSynced="True" />
+    <Attempt id="5" started="12/10/2024 14:52:02" isStartedSynced="True" ended="12/10/2024 14:52:35" isEndedSynced="True">
+      <PauseTime>00:00:31.2483938</PauseTime>
+    </Attempt>
+    <Attempt id="6" started="12/10/2024 14:52:50" isStartedSynced="True" ended="12/10/2024 23:45:16" isEndedSynced="True">
+      <PauseTime>00:50:19.6656432</PauseTime>
+    </Attempt>
+    <Attempt id="7" started="12/11/2024 14:47:53" isStartedSynced="False" ended="12/11/2024 15:36:19" isEndedSynced="True" />
+    <Attempt id="8" started="12/11/2024 21:47:40" isStartedSynced="True" ended="12/11/2024 21:58:26" isEndedSynced="True" />
+    <Attempt id="9" started="12/12/2024 10:04:57" isStartedSynced="True" ended="12/12/2024 12:42:20" isEndedSynced="True">
+      <PauseTime>00:00:08.4874732</PauseTime>
+    </Attempt>
+    <Attempt id="10" started="12/12/2024 12:42:22" isStartedSynced="True" ended="12/13/2024 01:08:03" isEndedSynced="True">
+      <PauseTime>05:59:08.6862126</PauseTime>
+    </Attempt>
+    <Attempt id="11" started="12/14/2024 10:30:31" isStartedSynced="False" ended="12/14/2024 10:41:31" isEndedSynced="True" />
+    <Attempt id="12" started="12/14/2024 13:25:21" isStartedSynced="True" ended="12/14/2024 13:43:28" isEndedSynced="True" />
+    <Attempt id="13" started="12/14/2024 21:21:32" isStartedSynced="True" ended="12/15/2024 02:15:30" isEndedSynced="True" />
+    <Attempt id="14" started="12/15/2024 09:29:43" isStartedSynced="True" ended="12/15/2024 23:16:39" isEndedSynced="True" />
+    <Attempt id="15" started="12/24/2024 09:16:32" isStartedSynced="True" ended="12/24/2024 10:23:08" isEndedSynced="True" />
+    <Attempt id="16" started="12/24/2024 10:23:25" isStartedSynced="True" ended="12/24/2024 11:54:13" isEndedSynced="True" />
+    <Attempt id="17" started="12/24/2024 11:54:34" isStartedSynced="True" ended="12/24/2024 12:20:49" isEndedSynced="True" />
+    <Attempt id="18" started="01/09/2025 13:44:57" isStartedSynced="False" ended="01/09/2025 23:46:55" isEndedSynced="True" />
+    <Attempt id="19" started="02/07/2025 12:07:59" isStartedSynced="True" ended="02/08/2025 00:52:31" isEndedSynced="True">
+      <PauseTime>12:39:46.5417500</PauseTime>
+    </Attempt>
+    <Attempt id="20" started="02/16/2025 16:22:15" isStartedSynced="True" ended="02/16/2025 16:49:22" isEndedSynced="True" />
+    <Attempt id="21" started="02/16/2025 16:49:25" isStartedSynced="True" ended="02/16/2025 20:19:42" isEndedSynced="True" />
+    <Attempt id="22" started="02/18/2025 16:28:38" isStartedSynced="True" ended="02/18/2025 16:45:59" isEndedSynced="True" />
+    <Attempt id="23" started="02/21/2025 08:48:24" isStartedSynced="True" ended="02/21/2025 08:48:37" isEndedSynced="True" />
+  </AttemptHistory>
+  <Segments>
+    <Segment>
+      <Name>Build Release</Name>
+      <Icon />
+      <SplitTimes>
+        <SplitTime name="Personal Best" />
+      </SplitTimes>
+      <BestSegmentTime />
+      <SegmentHistory />
+    </Segment>
+    <Segment>
+      <Name>Release</Name>
+      <Icon />
+      <SplitTimes>
+        <SplitTime name="Personal Best" />
+      </SplitTimes>
+      <BestSegmentTime />
+      <SegmentHistory />
+    </Segment>
+    <Segment>
+      <Name>Post on Discord</Name>
+      <Icon />
+      <SplitTimes>
+        <SplitTime name="Personal Best" />
+      </SplitTimes>
+      <BestSegmentTime />
+      <SegmentHistory />
+    </Segment>
+  </Segments>
+  <AutoSplitterSettings />
+</Run>
