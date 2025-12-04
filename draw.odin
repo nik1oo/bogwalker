@@ -12,7 +12,6 @@ import "core:reflect"
 import "core:strings"
 import "core:strconv"
 import "core:time"
-import tracy "shared:tracy"
 init_glfw::proc() {
 	glfw.SetErrorCallback(glfw_error_callback)
 	assert(bool(glfw.Init()))
@@ -65,20 +64,16 @@ select_render_buffer::proc(render_buffer:^Render_Buffer) {
 	gl.BindFramebuffer(gl.FRAMEBUFFER,u32(render_buffer.frame_buffer_handle))
 	gl.Viewport(0,0,i32(state.resolution.x),i32(state.resolution.y)) }
 clear_render_buffer::proc(render_buffer:^Render_Buffer) {
-	when TRACY_ENABLE { tracy.ZoneNC("clear render buffer",0x777777) }
 	gl.BindFramebuffer(gl.FRAMEBUFFER,u32(render_buffer.frame_buffer_handle))
 	gl.Clear(gl.COLOR_BUFFER_BIT)
-	gl.Clear(gl.DEPTH_BUFFER_BIT)
-	when TRACY_ENABLE { gl.Flush(); gl.Finish() } }
+	gl.Clear(gl.DEPTH_BUFFER_BIT) }
 select_frame_buffer::proc(frame_buffer_handle:u32) {
 	gl.BindFramebuffer(gl.FRAMEBUFFER,frame_buffer_handle)
 	gl.Viewport(0,0,i32(state.window_size.x),i32(state.window_size.y)) }
 clear_frame_buffer::proc(frame_buffer_handle:u32) {
-	when TRACY_ENABLE { tracy.ZoneNC("clear frame buffer",0x777777) }
 	gl.BindFramebuffer(gl.FRAMEBUFFER,frame_buffer_handle)
 	gl.Clear(gl.COLOR_BUFFER_BIT)
-	gl.Clear(gl.DEPTH_BUFFER_BIT)
-	when TRACY_ENABLE { gl.Flush(); gl.Finish() } }
+	gl.Clear(gl.DEPTH_BUFFER_BIT) }
 make_render_buffer_static::proc(size:[2]u16,n_buffers:int,internal_formats:[]i32,formats:[]u32,depth_component:bool=true)->(render_buffer:^Render_Buffer) {
 	render_buffer=new(Render_Buffer)
 	ok:=init_render_buffer_static(render_buffer,size,n_buffers,internal_formats,formats,depth_component)
@@ -191,9 +186,7 @@ bind_texture::proc(binding_point:u32,handle:u32) {
 	gl.ActiveTexture(binding_point)
 	gl.BindTexture(gl.TEXTURE_2D,u32(handle)) }
 draw_triangles::proc(count:i32) {
-	when TRACY_ENABLE { tracy.ZoneNC("draw triangles",0xFFFFFF) }
-	gl.DrawArrays(gl.TRIANGLES,0,count)
-	when TRACY_ENABLE { gl.Flush(); gl.Finish() } }
+	gl.DrawArrays(gl.TRIANGLES,0,count) }
 use_shader::proc(shader:^$T,loc:=#caller_location)->(^T) {
 	assert(shader!=nil,loc=loc); assert(shader.handle!=0,loc=loc)
 	gl.UseProgram(u32(shader.handle))
@@ -203,7 +196,6 @@ set_blend::proc(value:bool) {
 set_depth_test::proc(value:bool) {
 	if value { gl.Enable(gl.DEPTH_TEST) } else { gl.Disable(gl.DEPTH_TEST) } }
 render_texture::proc(name:string,pos:[2]f16,size:[2]f16={-1,-1},rotation:f16=0.0,depth:f16=0.0,lightness:f16=0.5,flags:Cell_Flags_Register={}) {
-	when TRACY_ENABLE { tracy.ZoneNC("render texture",0xFFFFFF) }
 	use_shader(state.texture_shader)
 	rotation_matrix:matrix[3,3]f32=pan_matrix(cast_array(pos,f32))*rotate_matrix(f32(rotation))*pan_matrix(cast_array(-pos,f32))
 	_,commands,_,_:=map_entry(&state.texture_draw_commands,name)
@@ -220,7 +212,6 @@ render_texture::proc(name:string,pos:[2]f16,size:[2]f16={-1,-1},rotation:f16=0.0
 		_,err:=append_soa_elem(commands,command)
 		assert(err==.None) }}
 render_texture_group::proc(name:string) {
-	when TRACY_ENABLE { tracy.ZoneNC("render textures group",0xFF0000) }
 	use_shader(state.texture_shader)
 	commands,ok:=&state.texture_draw_commands[name]; if !ok do return
 	n:=len(commands); if n==0 do return
@@ -239,7 +230,6 @@ render_texture_group::proc(name:string) {
 	draw_triangles(i32(6*n))
 	runtime.clear_soa_dynamic_array(commands) }
 render_text_group::proc(name:string) {
-	when TRACY_ENABLE { tracy.ZoneNC("render text group",0xFF0000) }
 	use_shader(state.font_shader)
 	commands,ok:=&state.text_draw_commands[name]; if !ok do return
 	n:=len(commands); if n==0 do return
@@ -256,19 +246,16 @@ render_text_group::proc(name:string) {
 	texture_filtering(gl.NEAREST)
 	draw_triangles(i32(6*n)) }
 render_bloom_threshold::proc(render_buffer:^Render_Buffer) {
-	when TRACY_ENABLE { tracy.ZoneNC("render bloom threshold",0xFFFFFF) }
 	use_shader(state.bloom_threshold_shader)
 	bind_texture(gl.TEXTURE0,render_buffer.texture_handles[0])
 	draw_triangles(6) }
 render_blur::proc(render_buffer:^Render_Buffer,step:i8) {
-	when TRACY_ENABLE { tracy.ZoneNC("render blur",0xFFFFFF) }
 	use_shader(state.blur_shader)
 	set_shader_param(state.blur_shader.resolution,cast_array(state.resolution,f32))
 	set_shader_param(state.blur_shader.step,i32(step))
 	bind_texture(gl.TEXTURE0,render_buffer.texture_handles[0])
 	draw_triangles(6) }
 render_bloom::proc(base_render_buffer:^Render_Buffer,bloom_render_buffer:^Render_Buffer) {
-	when TRACY_ENABLE { tracy.ZoneNC("render bloom",0xFFFFFF) }
 	use_shader(state.bloom_shader)
 	set_shader_param(state.bloom_shader.grayscale,i32(.DEAD in state.flags))
 	bind_texture(gl.TEXTURE0,base_render_buffer.texture_handles[0])
@@ -342,9 +329,7 @@ compile_shader::proc(shader:^Shader,allocator:=context.allocator,$vert_name:stri
 	shader.last_compile_time = time.now()
 	return true,{} }
 swap_buffers::proc() {
-	when TRACY_ENABLE { tracy.ZoneNC("swap buffers",0xFFFFFF) }
-	glfw.SwapBuffers(state.window)
-	when TRACY_ENABLE { gl.Flush(); gl.Finish() } }
+	glfw.SwapBuffers(state.window) }
 texture_filtering::proc(mode:i32) {
 	gl.TexParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,mode)
 	gl.TexParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,mode) }
@@ -368,7 +353,6 @@ error_callback::proc"c"(source:u32,type:u32,id:u32,severity:u32,length:i32,messa
 	context=runtime.default_context()
 	if severity>gl.DEBUG_SEVERITY_NOTIFICATION do fmt.println(source,type,id,severity,length,message) }
 render_text::proc(args:..any,sep:string="",pos:[2]f16={0,0},color:[4]f16=WHITE,scale_multiplier:f16=1.0,pivot:bit_set[Compass]={},font_name:string="font-medium",shadow:bool=true,spacing:f16=1.0,waviness:f16=0.0) {
-	when TRACY_ENABLE { tracy.ZoneNC("draw text",0xFF0000) }
 	_,commands,_,_:=map_entry(&state.text_draw_commands,font_name)
 	if cap(commands)==0 do commands^=make_soa_dynamic_array_len_cap(#soa[dynamic]Text_Draw_Command,length=0,capacity=TEXT_COMMANDS_CAP)
 	text:=fmt.aprint(..args,sep=sep)
@@ -410,7 +394,6 @@ destroy_renderer::proc() {
 	glfw.DestroyWindow(state.window)
 	glfw.Terminate() }
 draw_tick::proc() {
-	when TRACY_ENABLE { tracy.ZoneNC("draw trick",0xFFFFFF) }
 	set_blend(true)
 	state.texture_draw_commands=make_map_cap(map[string]#soa[dynamic]Texture_Draw_Command,capacity=TEXTURE_GROUPS_CAP,allocator=context.allocator)
 	state.text_draw_commands=make_map_cap(map[string]#soa[dynamic]Text_Draw_Command,capacity=TEXT_GROUPS_CAP,allocator=context.allocator)

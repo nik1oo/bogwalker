@@ -4,13 +4,11 @@ import "base:runtime"
 import "vendor:glfw"
 import "core:math"
 import "core:fmt"
-import tracy "shared:tracy"
 keymap:map[i32]Key = {
 	'F'=Key.F,
 	'R'=Key.R,
 	glfw.KEY_ESCAPE=Key.ESCAPE }
 input_tick::proc() {
-	when TRACY_ENABLE { tracy.ZoneN("input tick") }
 	state.flags-={.INPUT_RECEIVED}
 	glfw.PollEvents() }
 key_callback::proc"c"(window:glfw.WindowHandle,key,scancode,action,mods:i32) {

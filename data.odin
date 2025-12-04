@@ -8,7 +8,6 @@ import "core:mem"
 import "vendor:glfw"
 import "vendor:miniaudio"
 import gl "vendor:OpenGL"
-TRACY_ENABLE::#config(TRACY_ENABLE,false)
 BOUNDED_RUNTIME::#config(BOUNDED_RUNTIME,false)
 BLACK:[4]f16:{0,0,0,1}
 WHITE:[4]f16:{1,1,1,1}

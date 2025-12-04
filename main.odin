@@ -3,7 +3,6 @@ import "core:mem"
 import "core:fmt"
 import "core:math/rand"
 import "vendor:glfw"
-import tracy "shared:tracy"
 main::proc() {
 	init_data()
 	init_savefile()

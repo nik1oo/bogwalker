@@ -7,7 +7,6 @@ import "core:math/linalg"
 import "core:slice"
 import "core:math/rand"
 import "core:time"
-import tracy "shared:tracy"
 seed_board::proc(board:^Board) {
 	for i in 0..<board.size.x { for j in 0..<board.size.y {
 		board.seeds[i][j]=u32(rand.int31()) }}
@@ -136,7 +135,6 @@ all_crocs_are_flagged::proc(board:^Board)->bool {
 	for croc,_ in board.crocs do if !croc_is_flagged(board,croc.x,croc.y) do return false
 	return true }
 render_cell::proc(name:string,i,j:f16,extra_rotation:f16=0,direction:Compass=.NORTH,layer:f16=Layer.BOTTOM,flags:Cell_Flags_Register={}) {
-	when TRACY_ENABLE { tracy.ZoneNC("render cell",0xFFFFFF) }
 	pos:[2]f16=entity_pos(i,j)
 	// @(static) DIRECTION_ROTATION:[4]f16={-0.5*math.PI,0.5*math.PI,0,math.PI}
 	rotation:f16=DIRECTION_ROTATION[int(direction)]+extra_rotation
@@ -190,13 +188,11 @@ render_border::proc(directions:bit_set[Compass],i,j:i8) {
 	if .SOUTH in directions { render_texture(name=LINE_NAMES[(seed+3)%4],pos=(pos+{0,-TILE_SIZE/2}),size={TILE_SIZE,TILE_SIZE},rotation=math.PI/2) }}
 SURFACE_NAMES:=[?]string{"surface-1","surface-2","surface-3","surface-4"}
 render_surface::proc(i,j:i8,seed:u32) {
-	when TRACY_ENABLE { tracy.ZoneNC("render surface",0xFFFFFF) }
 	render_cell(name=SURFACE_NAMES[seed%4],i=f16(i),j=f16(j),layer=Layer.SURFACE,flags={.WAVY})
 	if seed<50_000_000 {
 		render_cell(name=FLOWER_NAMES[seed%4],i=f16(i),j=f16(j),layer=Layer.FLOWERS,flags={.WINDY}) }}
 BOTTOM_NAMES:=[?]string{"bottom-1","bottom-2","bottom-3","bottom-4"}
 render_bottom::proc(i,j:i8,seed:u32) {
-	when TRACY_ENABLE { tracy.ZoneNC("render bottom",0xFFFFFF) }
 	render_cell(name=BOTTOM_NAMES[seed%4],i=f16(i),j=f16(j),direction=.NORTH,layer=Layer.BOTTOM,flags={.WAVY,.CAUSTICS}) }
 board_iterator::proc(i,j:^i8) {
 	i^,j^=0,-1 }
@@ -228,13 +224,11 @@ calculate_threat::proc(board:^Board,i,j:i8)->i8 {
 	for croc in board.crocs do threat+=croc_threat(i,j,croc.x,croc.y)
 	return threat }
 calculate_threats::proc(board:^Board) {
-	when TRACY_ENABLE { tracy.ZoneNC("calculate threats",0xFFFFFF) }
 	i,j:i8; board_iterator(&i,&j)
 	for iterate_board(board,&i,&j) {
 		board.threats[i][j]=calculate_threat(board,i,j)
 		board.estimated_threats[i][j]=calculate_estimated_threat(board,i,j) }}
 calculate_threats_at::proc(board:^Board,i,j:i8) {
-	when TRACY_ENABLE { tracy.ZoneNC("calculate threats at",0xFFFFFF) }
 	board.threats[i][j]=calculate_threat(board,i,j)
 	board.estimated_threats[i][j]=calculate_estimated_threat(board,i,j) }
 calculate_threats_about::proc(board:^Board,center_i,center_j:i8) {
@@ -405,7 +399,6 @@ render_board::proc() {
 		if .HIGHSCORE_SET in state.flags do render_text("new highscore!",pos=text_pos+{0,-f16(state.resolution.y)+96},font_name="font-title",waviness=2.0,spacing=0.6) }
 	if .DEAD in state.flags do render_text("LOSER",pos=text_pos,color=WHITE,font_name="font-title",waviness=2.0,spacing=0.8) }
 board_tick::proc() {
-	when TRACY_ENABLE { tracy.ZoneNC("board tick",0xFFFFFF) }
 	board:^Board=&state.board
 	if all_crocs_are_flagged(board) {
 		pause_timer(&state.play_timer)
@@ -417,7 +410,6 @@ board_tick::proc() {
 			state.flags+={.HIGHSCORE_SET}
 			state.highscores[int(board.difficulty)]=time }}}
 game_tick::proc() {
-	when TRACY_ENABLE { tracy.ZoneNC("game tick",0xFFFFFF) }
 	state.keys_switched=state.keys_pressed~state.old_keys_pressed
 	state.mouse_switched=state.mouse_pressed~state.old_mouse_pressed
 	state.old_keys_pressed=state.keys_pressed
