@@ -15,8 +15,6 @@ main::proc() {
 	context.allocator=mem.arena_allocator(&state.arena)
 	init_view()
 	for state.frame_count=0; (!glfw.WindowShouldClose(state.window))&&(.RUNNING in state.flags); state.frame_count+=1 {
-		when TRACY_ENABLE do defer tracy.FrameMark()
-		when TRACY_ENABLE do tracy.ZoneN("tick")
 		rand.reset(u64(transmute(u32)state.net_time))
 		input_tick()
 		if !should_update() do continue

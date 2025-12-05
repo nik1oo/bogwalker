@@ -42,7 +42,7 @@ MENU_EXIT_I::BOARD_SIZE_MENU.x/2+3
 DEFAULT_VIEW_ZOOM::0.625
 FISH_NAME:string:"fish"
 FISHES_NAME:string:"fishes"
-CROC_HEAD_NAME:string:"croc-head"
+CROC_HEAD_NAME:string:"krokul"
 CROC_TAIL_NAME:string:"croc-tail"
 START_NAME:string:"start"
 DISPLAY_NAME:string:"display"
@@ -314,6 +314,19 @@ init_assets::proc() {
 	read_and_load_texture("./images/buoy.png")
 	read_and_load_texture("./images/title-0.png")
 	read_and_load_texture("./images/title-1.png")
+	read_and_load_texture("./images/krokul.png")
+	read_and_load_texture("./images/ignesa.png")
+	read_and_load_texture("./images/grendul.png")
+	read_and_load_texture("./images/bordana.png")
+	read_and_load_texture("./images/nokur.png")
+	read_and_load_texture("./images/backa.png")
+	read_and_load_texture("./images/vondul.png")
+	read_and_load_texture("./images/rusalka.png")
+	read_and_load_texture("./images/durrul.png")
+	read_and_load_texture("./images/bragul.png")
+	read_and_load_texture("./images/moosul.png")
+	read_and_load_texture("./images/rihtul.png")
+	read_and_load_texture("./images/trul.png")
 	load_font("./images/font.png")
 	load_font("./images/font-title.png")
 	load_font("./images/font-huge.png")

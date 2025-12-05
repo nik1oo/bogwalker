@@ -58,12 +58,6 @@ spawn_croc::proc(board:^Board,i,j:i8,direction:Compass) {
 	if cell_occupied(board,i,j) do return
 	// direction:=Compass(rand.int31_max(4))
 	head:Entity={.CROC_HEAD,direction}
-	tail:Entity={.CROC_TAIL,direction}
-	#partial switch direction {
-	case .EAST: if inside_board(board,i-1,j)&&!cell_occupied(board,i-1,j) do board.cells[i-1][j]=tail; else do return
-	case .WEST: if inside_board(board,i+1,j)&&!cell_occupied(board,i+1,j) do board.cells[i+1][j]=tail; else do return
-	case .NORTH: if inside_board(board,i,j-1)&&!cell_occupied(board,i,j-1) do board.cells[i][j-1]=tail; else do return
-	case .SOUTH: if inside_board(board,i,j+1)&&!cell_occupied(board,i,j+1) do board.cells[i][j+1]=tail; else do return }
 	board.cells[i][j]=head
 	append(&board.crocs,[2]i8{i,j}) }
 CROC_DIRECTIONS:[4]Compass={.EAST,.WEST,.NORTH,.SOUTH}
@@ -90,7 +84,10 @@ init_board::proc(difficulty:Difficulty) {
 	state.flags-={.HIGHSCORE_SET}
 	state.board.untouched=true
 	//reveal_random(&state.board)
-	// if state.control_state.screen==.GAME do reveal_board(&state.board)
+	// TEMP
+	if state.control_state.screen==.GAME do reveal_board(&state.board)
+	// TEMP
+	calculate_threats(&state.board)
 	board_tick()
 	zero_and_start_timer(&state.play_timer) }
 menu_board::proc(board:^Board) {
@@ -142,16 +139,9 @@ render_cell::proc(name:string,i,j:f16,extra_rotation:f16=0,direction:Compass=.NO
 	render_texture(name=name,pos=pos,size={TILE_SIZE,TILE_SIZE},rotation=rotation,depth=layer,lightness=hovered?(0.6+0.05*f16(math.sin(8*state.net_time))):(state.board.last_click==[2]i8{auto_cast i,auto_cast j})?0.7:0.5,flags=flags)
 	if hovered do state.hovered_name=name }
 render_fish::proc(fish:Fish) {
-	render_cell(name=fish.seed<0.1?FISHES_NAME:FISH_NAME,i=auto_cast fish.position.x,j=auto_cast fish.position.y,extra_rotation=0.1*f16(math.sin(4*state.net_time)),direction=.NORTH,layer=Layer.FISHES,flags={.WAVY,.CAUSTICS}) }
+	render_cell(name=fish.seed<0.1?FISHES_NAME:FISH_NAME,i=auto_cast fish.position.x,j=auto_cast fish.position.y,extra_rotation=0.1*f16(math.sin(4*state.net_time)),layer=Layer.FISHES,flags={.WAVY,.CAUSTICS}) }
 render_croc::proc(head_i,head_j:i8,direction:Compass) {
-	render_cell(name=CROC_HEAD_NAME,i=f16(head_i),j=f16(head_j),direction=direction,layer=Layer.CROCODILES,flags={.WAVY})
-	tail_i,tail_j:=head_i,head_j
-	#partial switch direction {
-	case .EAST: tail_i-=1
-	case .WEST: tail_i+=1
-	case .NORTH: tail_j-=1
-	case .SOUTH: tail_j+=1 }
-	if (state.board.vision[tail_i][tail_j])||((.DEAD in state.flags)||(.VICTORIOUS in state.flags)) do render_cell(name=CROC_TAIL_NAME,i=f16(tail_i),j=f16(tail_j),direction=direction,layer=Layer.CROCODILES,flags={.WAVY}) }
+	render_cell(name=CROC_HEAD_NAME,i=f16(head_i),j=f16(head_j),layer=Layer.CROCODILES,flags={.WAVY}) }
 // clear_cell::proc(board:^Board,i,j:int) {
 // 	deep_entity,found_deep:=board.cells[i][j].?
 // 	if found_deep&&(deep_entity.kind==.CROC_HEAD) do despawn_croc(board,i,j)
@@ -193,7 +183,7 @@ render_surface::proc(i,j:i8,seed:u32) {
 		render_cell(name=FLOWER_NAMES[seed%4],i=f16(i),j=f16(j),layer=Layer.FLOWERS,flags={.WINDY}) }}
 BOTTOM_NAMES:=[?]string{"bottom-1","bottom-2","bottom-3","bottom-4"}
 render_bottom::proc(i,j:i8,seed:u32) {
-	render_cell(name=BOTTOM_NAMES[seed%4],i=f16(i),j=f16(j),direction=.NORTH,layer=Layer.BOTTOM,flags={.WAVY,.CAUSTICS}) }
+	render_cell(name=BOTTOM_NAMES[seed%4],i=f16(i),j=f16(j),layer=Layer.BOTTOM,flags={.WAVY,.CAUSTICS}) }
 board_iterator::proc(i,j:^i8) {
 	i^,j^=0,-1 }
 iterate_board::proc(board:^Board,i,j:^i8)->bool {
@@ -377,10 +367,14 @@ render_board::proc() {
 	set_depth_test(false)
 	board_iterator(&i,&j)
 	for iterate_board(board,&i,&j) {
+		threat:=board.threats[i][j]
 		estimated_threat:=board.estimated_threats[i][j]
 		ep:=entity_pos(f16(i),f16(j))
 		tp:[3]f32=state.view_matrix*[3]f32{f32(ep.x),f32(ep.y),1}
-		if (estimated_threat!=0)&&(board.vision[i][j]) do render_text(fmt.aprint(estimated_threat),pos={f16(tp.x),f16(tp.y)},color=WHITE,spacing=0.5,font_name="font-medium",scale_multiplier=1.25+0.75*max(1-f16(linalg.length(state.cursor-[2]f32{tp.x,tp.y}))/(250*f16(state.view_zoom)),0.0)) }
+		// TEMP
+		if (threat!=0)&&(!cell_occupied(board,i,j)) do render_text(fmt.aprint(threat),pos={f16(tp.x),f16(tp.y)},color=WHITE,spacing=0.5,font_name="font-medium",scale_multiplier=1.25+0.75*max(1-f16(linalg.length(state.cursor-[2]f32{tp.x,tp.y}))/(250*f16(state.view_zoom)),0.0))
+		// if (estimated_threat!=0)&&(board.vision[i][j]) do render_text(fmt.aprint(estimated_threat),pos={f16(tp.x),f16(tp.y)},color=WHITE,spacing=0.5,font_name="font-medium",scale_multiplier=1.25+0.75*max(1-f16(linalg.length(state.cursor-[2]f32{tp.x,tp.y}))/(250*f16(state.view_zoom)),0.0))
+		}
 	text_pos:=[2]f16{0,-0.5*f16(state.window_size.y)+8}
 	text_pos={-0.5*f16(state.window_size.x)+8,-0.5*f16(state.window_size.y)+8}
 	render_text("ESC give up",pos=text_pos,pivot={.WEST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
