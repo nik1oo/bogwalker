@@ -244,8 +244,8 @@ Blur_Shader::struct {
 Blend_Shader::struct {
 	using shader:Shader }
 Mouse_Button::enum u8 { MOUSE_LEFT,MOUSE_RIGHT }
-Key::enum u8 { F,R,ESCAPE }
-Entity_Kind::enum u8 { CROC_HEAD, CROC_TAIL }
+Key::enum u8 { F,R,ESCAPE,SPACE }
+Entity_Kind::enum u8 { CROC }
 Cell_Flags::enum u8 { WAVY,CAUSTICS,WINDY }
 Cell_Flags_Register::bit_set[Cell_Flags]
 PI:f16:3.14159265358979323846264338327950288

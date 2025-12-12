@@ -7,6 +7,7 @@ import "core:fmt"
 keymap:map[i32]Key = {
 	'F'=Key.F,
 	'R'=Key.R,
+	glfw.KEY_SPACE=Key.SPACE,
 	glfw.KEY_ESCAPE=Key.ESCAPE }
 input_tick::proc() {
 	state.flags-={.INPUT_RECEIVED}
@@ -34,7 +35,7 @@ cursor_pos_callback::proc"c"(window:glfw.WindowHandle,x,y:f64) {
 	// if (abs(state.mouse_delta.x)<100)&&(abs(state.mouse_delta.y)<100) {
 	// 	state.mouse_delta={0,0} }
 	state.mouse_pos=mouse_pos
-	if state.control_state.screen==.GAME do if mouse_pressed(.MOUSE_RIGHT) {
+	if state.control_state.screen==.GAME do if (mouse_pressed(.MOUSE_RIGHT)||key_pressed(.SPACE)) {
 		state.view_pan+=cast_array(state.mouse_delta,f16)/state.view_zoom }
 	state.cursor+=state.mouse_delta/f32(state.view_zoom)
 	state.cursor=mouse_pos-{f32(state.window_size.x)/2,f32(state.window_size.y)/2}
@@ -61,6 +62,8 @@ mouse_was_pressed::proc(button:Mouse_Button)->bool {
 	return (button in state.mouse_pressed)&&(button in state.mouse_switched) }
 mouse_was_switched::proc(button:Mouse_Button)->bool {
 	return (button in state.mouse_switched) }
+key_pressed::proc(key:Key)->bool {
+	return (key in state.keys_pressed) }
 key_was_pressed::proc(key:Key)->bool {
 	return (key in state.keys_pressed)&&(key in state.keys_switched) }
 mouse_was_released::proc(button:Mouse_Button)->bool {

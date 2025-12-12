@@ -24,41 +24,17 @@ clear_board::proc(board:^Board) {
 random_direction::proc(pool:[]Compass)->Compass {
 	i:=rand.int31_max(i32(len(pool)))
 	return pool[i] }
-croc_at::proc(board:^Board,i,j:i8)->(head:[2]i8,tail:[2]i8,ok:bool) {
-	entity,found:=board.cells[i][j].?
-	if !found do return {},{},false
-	#partial switch entity.kind {
-	case .CROC_HEAD:
-		head={i,j}
-		#partial switch entity.direction {
-		case .EAST: tail={i-1,j}
-		case .WEST: tail={i+1,j}
-		case .NORTH: tail={i,j-1}
-		case .SOUTH: tail={i,j+1}
-		case: return {},{},false }
-	case .CROC_TAIL:
-		tail={i,j}
-		#partial switch entity.direction {
-		case .EAST: head={i+1,j}
-		case .WEST: head={i-1,j}
-		case .NORTH: head={i,j+1}
-		case .SOUTH: head={i,j-1}
-		case: return {},{},false }
-	case: return {},{},false }
-	return head,tail,true }
 despawn_croc::proc(board:^Board,i,j:i8) {
 	_,found:=board.cells[i][j].?
 	if !found do return
-	head,tail,ok:=croc_at(board,i,j)
-	if !ok do return
-	for croc,index in board.crocs do if croc==head { unordered_remove(&board.crocs,index); break }
-	board.cells[head.x][head.y]=nil
-	board.cells[tail.x][tail.y]=nil }
+	entity,ok:=board.cells[i][j].?
+	if (!ok)||(entity.kind!=.CROC) do return
+	for croc,index in board.crocs do if (croc==[2]i8{i, j}) { unordered_remove(&board.crocs,index); break }
+	board.cells[i][j]=nil }
 spawn_croc::proc(board:^Board,i,j:i8,direction:Compass) {
 	if cell_occupied(board,i,j) do return
 	// direction:=Compass(rand.int31_max(4))
-	head:Entity={.CROC_HEAD,direction}
-	board.cells[i][j]=head
+	board.cells[i][j]=Entity{.CROC,direction}
 	append(&board.crocs,[2]i8{i,j}) }
 CROC_DIRECTIONS:[4]Compass={.EAST,.WEST,.NORTH,.SOUTH}
 spawn_random_croc::proc(board:^Board) {
@@ -123,7 +99,7 @@ generate_board::proc(board:^Board,difficulty:Difficulty) {
 entity_pos::proc(i,j:f16)->[2]f16 {
 	return [2]f16{(f16(i)-f16(state.board.size.x-1)/2)*TILE_SIZE,(f16(j)-f16(state.board.size.y-1)/2)*TILE_SIZE} }
 render_entity::proc(entity:Entity,i,j:i8) {
-	if entity.kind==.CROC_HEAD do render_croc(i,j,entity.direction) }
+	if entity.kind==.CROC do render_croc(i,j,entity.direction) }
 render_whiteline::proc(i,j0,j1:f16) {
 	render_cell(name="whiteline-end",i=f16(i),j=f16(j1+1),layer=Layer.GUI_LINES)
 	for j in j0..=j1 do render_cell(name="whiteline-1",i=f16(i),j=f16(j),layer=Layer.GUI_LINES)
@@ -147,16 +123,12 @@ render_croc::proc(head_i,head_j:i8,direction:Compass) {
 // 	if found_deep&&(deep_entity.kind==.CROC_HEAD) do despawn_croc(board,i,j)
 // 	else if found_deep&&(deep_entity.kind==.CROC_TAIL) do despawn_croc(board,i,j) }
 croc_is_flagged::proc(board:^Board,i,j:i8)->bool {
-	_,found:=board.cells[i][j].?
-	if !found do return false
-	head,_,ok:=croc_at(board,i,j)
-	if !ok do return false
-	when FLAGGING_TAIL_COUNTS do return board.flags[head.x][head.y]||board.flags[tail.x][tail.y]
-	else do return board.flags[head.x][head.y] }
+	entity,ok:=board.cells[i][j].?
+	if (!ok)||(entity.kind!=.CROC) do return false
+	return board.flags[i][j] }
 cell_occupied::proc(board:^Board,i,j:i8)->bool {
 	deep_entity,found_deep:=board.cells[i][j].?
-	if found_deep&&(deep_entity.kind==.CROC_HEAD) do return true
-	else if found_deep&&(deep_entity.kind==.CROC_TAIL) do return true
+	if found_deep&&(deep_entity.kind==.CROC) do return true
 	else do return false }
 fish_tick::proc(fish:^Fish) {
 	// board:^Board=&state.board

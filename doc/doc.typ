@@ -16,3 +16,5 @@
 #proc("seed_board::proc(board:^Board)")[Assign a random seed to every cell on the board. Seeds are used to pick a variant, for visual elements that have variants.]
 
 #proc("clear_board::proc(board:^Board)")[Remove all entities from the board and make every tile invisible.]
+
+#proc("random_direction::proc(pool:[]Compass)->Compass")[Make a random direction. Every entity has a direction and some entities have direction-dependent behavior.]

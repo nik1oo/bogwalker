@@ -1,5 +1,5 @@
 main:
-	odin build . -out:Bogwalker.exe -subsystem:console -debug -max-error-count:8 -show-timings
+	odin run . -out:Bogwalker.exe -subsystem:console -debug -max-error-count:8 -show-timings
 debug:
 	odin build . -out:Bogwalker.exe -subsystem:console -debug -max-error-count:8
 	remedybg -g debug.rdbg
