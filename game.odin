@@ -26,12 +26,13 @@ random_direction::proc(pool:[]Compass)->Compass {
 	i:=rand.int31_max(i32(len(pool)))
 	return pool[i] }
 despawn_entity::proc(board:^Board,i,j:i8) {
-	entity,ok:=board.cells[i][j].?
-	if !ok do return
-	index,found:=slice.linear_search(board.entities[:],[2]i8{i,j})
-	if found do unordered_remove(&board.entities,index)
-	board.threats[i][j]=0
-	board.cells[i][j]=nil }
+	// entity,ok:=board.cells[i][j].?
+	// if !ok do return
+	// index,found:=slice.linear_search(board.entities[:],[2]i8{i,j})
+	// if found do unordered_remove(&board.entities,index)
+	// board.threats[i][j]=0
+	// board.cells[i][j]=nil
+}
 spawn_entity::proc(board:^Board,i,j:i8,entity_kind:Entity_Kind,direction:Compass) {
 	if cell_occupied(board,i,j) do return
 	board.cells[i][j]=Entity{entity_kind,direction}
@@ -141,7 +142,7 @@ populate_board::proc(board:^Board,difficulty:Difficulty) {
 entity_pos::proc(i,j:f16)->[2]f16 {
 	return [2]f16{(f16(i)-f16(state.board.size.x-1)/2)*TILE_SIZE,(f16(j)-f16(state.board.size.y-1)/2)*TILE_SIZE} }
 render_entity::proc(entity:Entity,i,j:i8) {
-	render_cell(name="crab"/*entity_names[entity.kind]*/,i=f16(i),j=f16(j),layer=Layer.CROCODILES,flags={.WAVY}) }
+	render_cell(name=entity_names[entity.kind],i=f16(i),j=f16(j),layer=Layer.CROCODILES,flags={.WAVY}) }
 render_whiteline::proc(i,j0,j1:f16) {
 	render_cell(name="whiteline-end",i=f16(i),j=f16(j1+1),layer=Layer.GUI_LINES)
 	for j in j0..=j1 do render_cell(name="whiteline-1",i=f16(i),j=f16(j),layer=Layer.GUI_LINES)
@@ -223,6 +224,9 @@ distance_to_entity::proc(board:^Board,i,j:i8)->i8 {
 // 	threat:i8=0
 // 	for croc in board.crocs do threat+=croc_threat(i,j,croc.x,croc.y)
 // 	return threat }
+clear_threats::proc(board:^Board) {
+	i,j:i8; board_iterator(&i,&j)
+	for iterate_board(board,&i,&j) do board.threats[i][j]=0 }
 calculate_threats::proc(board:^Board) {
 	for kind in Entity_Kind {
 		threats_in:=clone_2d_slice(board.threats)
@@ -232,12 +236,11 @@ calculate_threats::proc(board:^Board) {
 			if !found do continue
 			if entity.kind!=kind do continue
 			fmt.println("putting threat on",pos,entity.kind)
-			board.threats[pos.x][pos.y]=(cast(i8)entity.kind)+1
-			// #partial switch kind {
-			// case .KROKUL: calculate_threats_krokul(pos,entity.direction,board.size,threats_in,board.threats)
-			// case .IGNESA: calculate_threats_ignesa(pos,entity.direction,board.size,threats_in,board.threats)
-			// case .BORDANA: calculate_threats_bordana(pos,entity.direction,board.size,threats_in,board.threats) }
-	}}}
+			// board.threats[pos.x][pos.y]=(cast(i8)entity.kind)+1
+			#partial switch kind {
+			case .KROKUL: calculate_threats_krokul(pos,entity.direction,board.size,threats_in,board.threats)
+			case .IGNESA: calculate_threats_ignesa(pos,entity.direction,board.size,threats_in,board.threats)
+			case .BORDANA: calculate_threats_bordana(pos,entity.direction,board.size,threats_in,board.threats) }}}}
 calculate_threats_krokul::proc(pos:[2]i8,direction:Compass,board_size:[2]i8,threats_in:[][]i8,threats_out:[][]i8) {
 	offsets:=[?][2]i8{{-1,0},{1,0},{0,-1},{0,1}}
 	for offset in offsets {
@@ -265,7 +268,6 @@ calculate_threats_ignesa::proc(pos:[2]i8,direction:Compass,board_size:[2]i8,thre
 		if ([2]i8{i,j}==pos) do continue
 		threats_out[i][j] += 1 }}
 BORDANA_DESCRIPTION:string:"For every tile in a 5x5 square around Ignesa, increase threat by 1 if a neighboring tile has a threat greater than 0, or if a neighboring tile has this Bordana."
-// DICK
 calculate_threats_bordana::proc(pos:[2]i8,direction:Compass,board_size:[2]i8,threats_in:[][]i8,threats_out:[][]i8) {
 	points:=make_square(pos,2,board_size)
 	for point in points {
@@ -545,10 +547,10 @@ game_tick::proc() {
 			if mouse_pressed(.MOUSE_LEFT) {
 				click_pos:=state.hovered_pos
 				if board.untouched {
-					// DICK
 					if cell_occupied(board,click_pos.x,click_pos.y) do despawn_entity(board,click_pos.x,click_pos.y)
 					when AREAL_FIRST_CLEAR do for entity in board.entities do if cells_distance(entity.x,entity.y,click_pos.x,click_pos.y)<=CROC_WIGGLINESS do despawn_entity(board,entity.x,entity.y)
-				}
+					clear_threats(&state.board)
+					calculate_threats(&state.board) }
 				if !board.flags[click_pos.x][click_pos.y] do if reveal_cell(board,click_pos.x,click_pos.y) {
 					switch rand.int31_max(10) {
 						case 0: play_sound("clear0")

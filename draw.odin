@@ -257,7 +257,8 @@ render_blur::proc(render_buffer:^Render_Buffer,step:i8) {
 	draw_triangles(6) }
 render_bloom::proc(base_render_buffer:^Render_Buffer,bloom_render_buffer:^Render_Buffer) {
 	use_shader(state.bloom_shader)
-	set_shader_param(state.bloom_shader.grayscale,i32(.DEAD in state.flags))
+	// TEMP
+	// set_shader_param(state.bloom_shader.grayscale,i32(.DEAD in state.flags))
 	bind_texture(gl.TEXTURE0,base_render_buffer.texture_handles[0])
 	bind_texture(gl.TEXTURE1,bloom_render_buffer.texture_handles[0])
 	draw_triangles(6) }
