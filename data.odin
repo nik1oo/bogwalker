@@ -32,7 +32,7 @@ TEXT_GROUPS_CAP::4
 TEXTURE_COMMANDS_CAP::4096
 TEXT_COMMANDS_CAP::8192
 state:^State=nil
-DEFAULT_WINDOW_SIZE:[2]u16:{1280,720}
+DEFAULT_WINDOW_SIZE:[2]u16:{1728,972}
 Layer:struct{BOTTOM,CROCODILES,FISHES,SURFACE,FLOWERS,GUI_LINES,GUI_ICONS,GUI_TEXT:f16}:{0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1}
 MENU_J::4
 MENU_START_I::BOARD_SIZE_MENU.x/2-3
@@ -57,6 +57,7 @@ QUAD_VERTS::6
 DEFAULT_DISPLAY_SETTING::0
 DEFAULT_AUDIO_SETTING::1.0
 Flags::bit_set[enum{INPUT_RECEIVED,AUDIO_MENU_DRAWN,HIGHSCORE_SET,DEAD,VICTORIOUS,RUNNING,FULLSCREEN,}]
+entity_names:map[Entity_Kind]string
 State::struct {
 	flags:Flags,
 	texture_draw_commands:map[string]#soa[dynamic]Texture_Draw_Command,
@@ -244,8 +245,8 @@ Blur_Shader::struct {
 Blend_Shader::struct {
 	using shader:Shader }
 Mouse_Button::enum u8 { MOUSE_LEFT,MOUSE_RIGHT }
-Key::enum u8 { F,R,ESCAPE,SPACE }
-Entity_Kind::enum u8 { CROC }
+Key::enum u8 { Q,W,E,F,R,ESCAPE,SPACE,ONE,TWO,THREE }
+Entity_Kind::enum u8 { KROKUL,IGNESA,BACKA,BORDANA,BRAGUL,DRAKUL,DURRUL,GRENDUL,MOOSUL,NOKUR,RIHTUL,RUSALKA,TRUL,VONDUL }
 Cell_Flags::enum u8 { WAVY,CAUSTICS,WINDY }
 Cell_Flags_Register::bit_set[Cell_Flags]
 PI:f16:3.14159265358979323846264338327950288
@@ -261,15 +262,15 @@ Fish::struct {
 Board::struct {
 	size:[2]i8,
 	difficulty:Difficulty,
-	vision:[BOARD_SIZE_HARD.x][BOARD_SIZE_HARD.y]bool,
-	cells:[BOARD_SIZE_HARD.x][BOARD_SIZE_HARD.y]Maybe(Entity),
-	crocs:[dynamic][2]i8,
-	projected_cell_rects:[BOARD_SIZE_HARD.x][BOARD_SIZE_HARD.y]Rect(f16),
-	seeds:[BOARD_SIZE_HARD.x][BOARD_SIZE_HARD.y]u32,
-	flags:[BOARD_SIZE_HARD.x][BOARD_SIZE_HARD.y]bool,
+	vision:[][]bool,
+	cells:[][]Maybe(Entity),
+	projected_cell_rects:[][]Rect(f16),
+	seeds:[][]u32,
+	flags:[][]bool,
+	threats:[][]i8,
+	estimated_threats:[][]i8,
+	entities:[dynamic][2]i8,
 	n_flags:u8,
-	threats:[BOARD_SIZE_HARD.x][BOARD_SIZE_HARD.y]i8,
-	estimated_threats:[BOARD_SIZE_HARD.x][BOARD_SIZE_HARD.y]i8,
 	fishes:[dynamic]Fish,
 	last_click:[2]i8,
 	untouched:bool }
@@ -343,4 +344,18 @@ init_assets::proc() {
 	load_sound("./sounds/clear6.wav")
 	load_sound("./sounds/clear7.wav")
 	load_sound("./sounds/clear8.wav")
-	load_sound("./sounds/clear9.wav") }
+	load_sound("./sounds/clear9.wav")
+	entity_names=make(map[Entity_Kind]string)
+	entity_names[.KROKUL]="krokul"
+	entity_names[.IGNESA]="ignesa"
+	entity_names[.GRENDUL]="grendul"
+	entity_names[.BORDANA]="bordana"
+	entity_names[.NOKUR]="nokur"
+	entity_names[.BACKA]="backa"
+	entity_names[.VONDUL]="vondul"
+	entity_names[.RUSALKA]="rusalka"
+	entity_names[.DURRUL]="durrul"
+	entity_names[.BRAGUL]="bragul"
+	entity_names[.MOOSUL]="moosul"
+	entity_names[.RIHTUL]="rihtul"
+	entity_names[.TRUL]="trul" }

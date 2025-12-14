@@ -3,6 +3,7 @@ import "core:time"
 import "core:os"
 import "core:path/filepath"
 import "core:strings"
+import "core:slice"
 import "core:sys/windows"
 rect_left::proc "fastcall"(rect:Rect($T))->T {
 	return rect.pos.x-rect.size.x/2 }
@@ -84,3 +85,24 @@ init_clock::proc() {
 	zero_and_start_timer(&state.timer)
 	zero_and_start_timer(&state.frame_timer)
 	zero_and_start_timer(&state.draw_tick_timer) }
+make_2d_slice::proc($T:typeid,w:int,h:int)->[][]T {
+	result:[][]T=make([][]T,w)
+	for _,i in result do result[i]=make([]T,h)
+	return result }
+delete_2d_slice::proc(array:[][]$T) {
+	// TODO
+}
+fill_2d_slice::proc(array:[][]$T, value: T) {
+	for _,i in array do slice.fill(array[i], value) }
+clone_2d_slice::proc(array:[][]$T)->(result:[][]T) {
+	result=make_2d_slice(T,len(array),len(array[0]))
+	for _,i in array do for _,j in array[0] do result[i][j]=array[i][j]
+	return result }
+make_square::proc(center:[2]i8,radius:i8,board_size:[2]i8)->[][2]i8 {
+	square:[dynamic][2]i8=make_dynamic_array([dynamic][2]i8)
+	for i in center.x-radius..=center.x+radius do for j in center.y-radius..=center.y+radius {
+		if (i<0)||(j<0)||(i>=board_size.x)||(j>=board_size.y) do continue
+		append(&square,[2]i8{i,j}) }
+	return square[:] }
+// make_rhomb_offsets::proc()->[][2]i8 {
+// }

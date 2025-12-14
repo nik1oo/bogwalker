@@ -7,7 +7,7 @@ import "core:strconv"
 default_settings::proc()->(settings:Settings) {
 	settings.display=auto_cast DEFAULT_DISPLAY_SETTING
 	settings.audio=DEFAULT_AUDIO_SETTING
-	settings.window_size={1280,720}
+	settings.window_size=DEFAULT_WINDOW_SIZE
 	return settings }
 @(require_results)
 default_highscores::proc()->(highscores:Highscores) {

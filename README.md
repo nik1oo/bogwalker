@@ -16,8 +16,8 @@ Reveal tiles by clicking on them. The numbers tell you how many crocodiles there
 # Monster Codex
 
 Krokul (the hybrid archetype) -- humanoid crocodile with a spear.
-Ignesa (the ghost archetype) -- will-o-the-wisp, a flaming ghost with a woman's face.
-Grendul (the beast archetype) -- Grendel
+Ignesa (the ghost archetype) -- will-o-the-wisp, a flaming ghost with a woman's face. It's purpose is to misguide travelers.
+Grendul (the beast archetype) -- Grendel, werewolf-looking beast.
 Bordana (the witch archetype) -- Borda, a blindfolded witch. personifies fear of the swamp. creates fog.
 Nokur (the shapeshifter archetype) -- Nixie, a shapeshifting water spirit, that looks like a worm/dragon.
 Backa (the ? archetype) -- Brook Horse, a white horse.

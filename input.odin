@@ -5,8 +5,14 @@ import "vendor:glfw"
 import "core:math"
 import "core:fmt"
 keymap:map[i32]Key = {
+	'Q'=Key.Q,
+	'W'=Key.W,
+	'E'=Key.E,
 	'F'=Key.F,
 	'R'=Key.R,
+	'1'=Key.ONE,
+	'2'=Key.TWO,
+	'3'=Key.THREE,
 	glfw.KEY_SPACE=Key.SPACE,
 	glfw.KEY_ESCAPE=Key.ESCAPE }
 input_tick::proc() {

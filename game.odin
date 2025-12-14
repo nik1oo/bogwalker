@@ -10,36 +10,37 @@ import "core:time"
 seed_board::proc(board:^Board) {
 	for i in 0..<board.size.x { for j in 0..<board.size.y {
 		board.seeds[i][j]=u32(rand.int31()) }}
-	board.seeds[MENU_START_I][MENU_J]+=50_000_000
-	board.seeds[MENU_DISPLAY_I][MENU_J]+=50_000_000
-	board.seeds[MENU_AUDIO_I][MENU_J]+=50_000_000
-	board.seeds[MENU_EXIT_I][MENU_J]+=50_000_000 }
+	// board.seeds[MENU_START_I][MENU_J]+=50_000_000
+	// board.seeds[MENU_DISPLAY_I][MENU_J]+=50_000_000
+	// board.seeds[MENU_AUDIO_I][MENU_J]+=50_000_000
+	// board.seeds[MENU_EXIT_I][MENU_J]+=50_000_000
+	}
 clear_board::proc(board:^Board) {
-	for i in 0..<board.size.x { for j in 0..<board.size.y {
+	for i in 0..<board.size.x do for j in 0..<board.size.y {
 		board.vision[i][j]=false
 		board.cells[i][j]=nil
-		board.projected_cell_rects={}
-		board.flags={} }}
+		fill_2d_slice(board.projected_cell_rects, Rect(f16){})
+		fill_2d_slice(board.flags,false) }
 	clear_dynamic_array(&board.fishes) }
 random_direction::proc(pool:[]Compass)->Compass {
 	i:=rand.int31_max(i32(len(pool)))
 	return pool[i] }
-despawn_croc::proc(board:^Board,i,j:i8) {
-	_,found:=board.cells[i][j].?
-	if !found do return
+despawn_entity::proc(board:^Board,i,j:i8) {
 	entity,ok:=board.cells[i][j].?
-	if (!ok)||(entity.kind!=.CROC) do return
-	for croc,index in board.crocs do if (croc==[2]i8{i, j}) { unordered_remove(&board.crocs,index); break }
+	if !ok do return
+	index,found:=slice.linear_search(board.entities[:],[2]i8{i,j})
+	if found do unordered_remove(&board.entities,index)
+	board.threats[i][j]=0
 	board.cells[i][j]=nil }
-spawn_croc::proc(board:^Board,i,j:i8,direction:Compass) {
+spawn_entity::proc(board:^Board,i,j:i8,entity_kind:Entity_Kind,direction:Compass) {
 	if cell_occupied(board,i,j) do return
-	// direction:=Compass(rand.int31_max(4))
-	board.cells[i][j]=Entity{.CROC,direction}
-	append(&board.crocs,[2]i8{i,j}) }
+	board.cells[i][j]=Entity{entity_kind,direction}
+	fmt.println("putting entity on", [2]i8{i,j})
+	append(&board.entities,[2]i8{i,j}) }
 CROC_DIRECTIONS:[4]Compass={.EAST,.WEST,.NORTH,.SOUTH}
-spawn_random_croc::proc(board:^Board) {
-	spawn_croc(board,i8(rand.int31_max(i32(board.size.x-2))+1),i8(rand.int31_max(i32(board.size.y-2))+1),random_direction(CROC_DIRECTIONS[:])) }
 init_board::proc(difficulty:Difficulty) {
+	// DICK
+	context.allocator=runtime.heap_allocator()
 	state.board.difficulty=difficulty
 	if state.control_state.screen==.GAME {
 		switch difficulty {
@@ -49,10 +50,18 @@ init_board::proc(difficulty:Difficulty) {
 		case .HARD: state.board.size=BOARD_SIZE_HARD }}
 	else {
 		state.board.size=BOARD_SIZE_MENU }
+	state.board.entities=make_dynamic_array_len_cap([dynamic][2]i8,0,128)
+	state.board.vision=make_2d_slice(bool,cast(int)state.board.size.x,cast(int)state.board.size.y)
+	state.board.cells=make_2d_slice(Maybe(Entity),cast(int)state.board.size.x,cast(int)state.board.size.y)
+	state.board.projected_cell_rects=make_2d_slice(Rect(f16),cast(int)state.board.size.x,cast(int)state.board.size.y)
+	state.board.seeds=make_2d_slice(u32,cast(int)state.board.size.x,cast(int)state.board.size.y)
+	state.board.flags=make_2d_slice(bool,cast(int)state.board.size.x,cast(int)state.board.size.y)
+	state.board.threats=make_2d_slice(i8,cast(int)state.board.size.x,cast(int)state.board.size.y)
+	state.board.estimated_threats=make_2d_slice(i8,cast(int)state.board.size.x,cast(int)state.board.size.y)
 	clear_board(&state.board)
-	clear(&state.board.crocs)
+	clear(&state.board.entities)
 	state.board.n_flags=0
-	if state.control_state.screen==.GAME do generate_board(&state.board,difficulty)
+	if state.control_state.screen==.GAME do populate_board(&state.board,difficulty)
 	else do menu_board(&state.board)
 	seed_board(&state.board)
 	state.flags-={.DEAD}
@@ -61,51 +70,84 @@ init_board::proc(difficulty:Difficulty) {
 	state.board.untouched=true
 	//reveal_random(&state.board)
 	// TEMP
-	if state.control_state.screen==.GAME do reveal_board(&state.board)
+	if state.control_state.screen==.GAME do board_set_vision(&state.board,false)
 	// TEMP
+	// DICK
 	calculate_threats(&state.board)
 	board_tick()
 	zero_and_start_timer(&state.play_timer) }
 menu_board::proc(board:^Board) {
 	set_depth_test(true)
 	i,j:i8; board_iterator(&i,&j)
-	for iterate_board(board,&i,&j) do if cells_distance(BOARD_SIZE_MENU.x/2,BOARD_SIZE_MENU.y/2,i,j)>(8+i8(rand.int31_max(16))) do board.vision[i][j]=true
-	for _ in 0..=240 do spawn_random_croc(board) }
+	for iterate_board(board,&i,&j) do if cells_distance(BOARD_SIZE_MENU.x/2,BOARD_SIZE_MENU.y/2,i,j)>(8+i8(rand.int31_max(16))) do board.vision[i][j]=true }
 random_normalized_vector::proc()->[2]f16 {
 	return linalg.normalize([2]f16{f16(rand.float32())*2-1,f16(rand.float32())*2-1}) }
 random_fish::proc(board:^Board)->Fish {
 	return Fish{seed=rand.float32(),cluster=bool(rand.int31_max(2)),position={f16(rand.float32_range(1,f32(board.size.x-1))),f16(rand.float32_range(1,f32(board.size.y-1)))},direction=random_normalized_vector()} }
-reveal_board::proc(board:^Board) {
+// reveal_board::proc(board:^Board) {
+// 	i,j:i8; board_iterator(&i,&j)
+// 	for iterate_board(board,&i,&j) do board.vision[i][j]=true }
+board_set_vision::proc(board:^Board,vision:bool) {
 	i,j:i8; board_iterator(&i,&j)
-	for iterate_board(board,&i,&j) do board.vision[i][j]=true }
-generate_board::proc(board:^Board,difficulty:Difficulty) {
-	croc_density:f32=CROC_DENSITY[int(difficulty)]
+	for iterate_board(board,&i,&j) do board.vision[i][j]=vision }
+// hide_board::proc(board:^Board) {
+// 	i,j:i8; board_iterator(&i,&j)
+// 	for iterate_board(board,&i,&j) do board.vision[i][j]=true }
+hide_entities::proc(board:^Board) {
+	for pos in board.entities do board.vision[pos.x][pos.y]=false }
+hide_enclosed::proc(board:^Board) {
+	for i in 0..<board.size.x do for j in 0..<board.size.y {
+		if board.vision[i][j]==false do continue
+		if i>0 do if board.threats[i-1][j]==0 do continue
+		if i<board.size.x-1 do if board.threats[i+1][j]==0 do continue
+		if j>0 do if board.threats[i][j-1]==0 do continue
+		if j<board.size.y-1 do if board.threats[i][j+1]==0 do continue
+		board.vision[i][j]=false }}
+hide_semienclosed::proc(board:^Board) {
+	for i in 0..<board.size.x do for j in 0..<board.size.y {
+		n_adjacent_threats:int=0
+		offsets:=[?][2]i8{{-1,0},{1,0},{0,-1},{0,1}}
+		for offset in offsets {
+			m:i8=i+offset.x
+			n:i8=j+offset.y
+			if (m<0)||(n<0)||(m>=board.size.x)||(n>=board.size.y) do continue
+			if board.threats[m][n]>0 do n_adjacent_threats+=1 }
+		if n_adjacent_threats>=3 do board.vision[i][j]=false }}
+spawn_entities::proc(board:^Board,entity_kind:Entity_Kind,density:f32,cluster_density:int,cluster_size:int) {
 	i,j:i8; board_iterator(&i,&j)
-	for iterate_board(board,&i,&j) do if rand.float32()<croc_density {
-		spawn_croc(board,i,j,Compass(rand.int31_max(4)))
-		if CLUSTER_DENSITY[int(board.difficulty)]>0 {
-			for l in 0..<CLUSTER_DENSITY[int(board.difficulty)] {
-				w:[2]i8={i,j}
-				for k in 0..<CLUSTER_SIZE[int(board.difficulty)] do w+=DIRECTION_STEP[Compass(rand.int31_max(4))]
-				if inside_board(board,w.x,w.y) do spawn_croc(board,w.x,w.y,Compass(rand.int31_max(4))) }}}
-	if len(board.crocs)<MINIMUM_NUMBER_OF_CROCS {
-		extra_crocs:=MINIMUM_NUMBER_OF_CROCS-len(board.crocs)
-		for _ in 0..<extra_crocs do spawn_random_croc(board) }
-	board_iterator(&i,&j)
-	board.fishes=runtime.make_dynamic_array_len_cap([dynamic]Fish,0,100)
-	for k in 0..=100 {
-		append_elem(&board.fishes,random_fish(board))
-		rand.reset(u64(k)) }}
+	for iterate_board(board,&i,&j) do if rand.float32()<density {
+		spawn_entity(board,i,j,entity_kind,Compass(rand.int31_max(4)))
+		// TEMP
+		// if cluster_density>0 {
+		// 	for l in 0..<cluster_density {
+		// 		w:[2]i8={i,j}
+		// 		for k in 0..<cluster_size do w+=DIRECTION_STEP[Compass(rand.int31_max(4))]
+		// 		if inside_board(board,w.x,w.y) do spawn_entity(board,w.x,w.y,entity_kind,Compass(rand.int31_max(4))) }}
+	}}
+despawn_invalid_entities::proc(board:^Board) {
+	/// remove ignesas that have a bait outside the board
+}
+populate_board::proc(board:^Board,difficulty:Difficulty) {
+	spawn_entities(board,.KROKUL,0.04,0,32)
+	// spawn_entities(board,.IGNESA,0.005,0,32)
+	// spawn_entities(board,.GRENDUL,0.02,0,32)
+	// spawn_entities(board,.BORDANA,0.02,0,32)
+	// TEMP
+	// board.fishes=runtime.make_dynamic_array_len_cap([dynamic]Fish,0,100)
+	// for k in 0..=100 {
+	// 	append_elem(&board.fishes,random_fish(board))
+	// 	rand.reset(u64(k)) }
+	}
 entity_pos::proc(i,j:f16)->[2]f16 {
 	return [2]f16{(f16(i)-f16(state.board.size.x-1)/2)*TILE_SIZE,(f16(j)-f16(state.board.size.y-1)/2)*TILE_SIZE} }
 render_entity::proc(entity:Entity,i,j:i8) {
-	if entity.kind==.CROC do render_croc(i,j,entity.direction) }
+	render_cell(name="crab"/*entity_names[entity.kind]*/,i=f16(i),j=f16(j),layer=Layer.CROCODILES,flags={.WAVY}) }
 render_whiteline::proc(i,j0,j1:f16) {
 	render_cell(name="whiteline-end",i=f16(i),j=f16(j1+1),layer=Layer.GUI_LINES)
 	for j in j0..=j1 do render_cell(name="whiteline-1",i=f16(i),j=f16(j),layer=Layer.GUI_LINES)
 	render_cell(name="whiteline-end",i=f16(i),j=f16(j0-1),direction=.SOUTH,layer=Layer.GUI_LINES) }
-all_crocs_are_flagged::proc(board:^Board)->bool {
-	for croc,_ in board.crocs do if !croc_is_flagged(board,croc.x,croc.y) do return false
+all_entities_are_flagged::proc(board:^Board)->bool {
+	for entity,_ in board.entities do if !entity_is_flagged(board,entity.x,entity.y) do return false
 	return true }
 render_cell::proc(name:string,i,j:f16,extra_rotation:f16=0,direction:Compass=.NORTH,layer:f16=Layer.BOTTOM,flags:Cell_Flags_Register={}) {
 	pos:[2]f16=entity_pos(i,j)
@@ -116,20 +158,16 @@ render_cell::proc(name:string,i,j:f16,extra_rotation:f16=0,direction:Compass=.NO
 	if hovered do state.hovered_name=name }
 render_fish::proc(fish:Fish) {
 	render_cell(name=fish.seed<0.1?FISHES_NAME:FISH_NAME,i=auto_cast fish.position.x,j=auto_cast fish.position.y,extra_rotation=0.1*f16(math.sin(4*state.net_time)),layer=Layer.FISHES,flags={.WAVY,.CAUSTICS}) }
-render_croc::proc(head_i,head_j:i8,direction:Compass) {
-	render_cell(name=CROC_HEAD_NAME,i=f16(head_i),j=f16(head_j),layer=Layer.CROCODILES,flags={.WAVY}) }
 // clear_cell::proc(board:^Board,i,j:int) {
 // 	deep_entity,found_deep:=board.cells[i][j].?
-// 	if found_deep&&(deep_entity.kind==.CROC_HEAD) do despawn_croc(board,i,j)
-// 	else if found_deep&&(deep_entity.kind==.CROC_TAIL) do despawn_croc(board,i,j) }
-croc_is_flagged::proc(board:^Board,i,j:i8)->bool {
+// 	if found_deep&&(deep_entity.kind==.CROC_HEAD) do despawn_entity(board,i,j)
+// 	else if found_deep&&(deep_entity.kind==.CROC_TAIL) do despawn_entity(board,i,j) }
+entity_is_flagged::proc(board:^Board,i,j:i8)->bool {
 	entity,ok:=board.cells[i][j].?
-	if (!ok)||(entity.kind!=.CROC) do return false
+	if !ok do return false
 	return board.flags[i][j] }
 cell_occupied::proc(board:^Board,i,j:i8)->bool {
-	deep_entity,found_deep:=board.cells[i][j].?
-	if found_deep&&(deep_entity.kind==.CROC) do return true
-	else do return false }
+	return board.cells[i][j]!=nil }
 fish_tick::proc(fish:^Fish) {
 	// board:^Board=&state.board
 	// t:=state.net_time
@@ -166,40 +204,92 @@ cells_distance::proc(i1,j1,i2,j2:i8)->i8 {
 	return i8(math.round(linalg.length([2]f32{f32(i1-i2),f32(j1-j2)}))) }
 	// return auto_cast math.sqrt_f16(f16((i1-i2)*(i1-i2)+(j1-j2)*(j1-j2))) }
 	// return int(linalg.floor(linalg.length([2]f32{f32(i1),f32(j1)}-[2]f32{f32(i2),f32(j2)}))) }
-distance_to_croc::proc(board:^Board,i,j:i8)->i8 {
+distance_to_entity::proc(board:^Board,i,j:i8)->i8 {
 	min_dist:i8=auto_cast c.INT8_MAX
-	for croc in board.crocs {
-		dist:=cells_distance(i,j,croc.x,croc.y)
+	for entity in board.entities {
+		dist:=cells_distance(i,j,entity.x,entity.y)
 		if dist<min_dist do min_dist=dist }
 	return min_dist }
-croc_threat::proc(i,j,ci,cj:i8)->i8 {
-	when LINEAR_THREAT do return max(CROC_WIGGLINESS-cells_distance(i,j,ci,cj),0)
-	else do return cells_distance(i,j,ci,cj)<CROC_WIGGLINESS?1:0 }
-calculate_estimated_threat::proc(board:^Board,i,j:i8)->i8 {
-	threat:i8=0
-	for croc in board.crocs do threat+=croc_threat(i,j,croc.x,croc.y)
-	k,l:i8; board_iterator(&k,&l)
-	for iterate_board(board,&k,&l) do if board.flags[k][l] do threat-=croc_threat(i,j,k,l)
-	return threat }
-calculate_threat::proc(board:^Board,i,j:i8)->i8 {
-	threat:i8=0
-	for croc in board.crocs do threat+=croc_threat(i,j,croc.x,croc.y)
-	return threat }
+// croc_threat::proc(i,j,ci,cj:i8)->i8 {
+// 	when LINEAR_THREAT do return max(CROC_WIGGLINESS-cells_distance(i,j,ci,cj),0)
+// 	else do return cells_distance(i,j,ci,cj)<CROC_WIGGLINESS?1:0 }
+// calculate_estimated_threat::proc(board:^Board,i,j:i8)->i8 {
+// 	threat:i8=0
+// 	for croc in board.crocs do threat+=croc_threat(i,j,croc.x,croc.y)
+// 	k,l:i8; board_iterator(&k,&l)
+// 	for iterate_board(board,&k,&l) do if board.flags[k][l] do threat-=croc_threat(i,j,k,l)
+// 	return threat }
+// calculate_threat::proc(board:^Board,i,j:i8)->i8 {
+// 	threat:i8=0
+// 	for croc in board.crocs do threat+=croc_threat(i,j,croc.x,croc.y)
+// 	return threat }
 calculate_threats::proc(board:^Board) {
-	i,j:i8; board_iterator(&i,&j)
-	for iterate_board(board,&i,&j) {
-		board.threats[i][j]=calculate_threat(board,i,j)
-		board.estimated_threats[i][j]=calculate_estimated_threat(board,i,j) }}
-calculate_threats_at::proc(board:^Board,i,j:i8) {
-	board.threats[i][j]=calculate_threat(board,i,j)
-	board.estimated_threats[i][j]=calculate_estimated_threat(board,i,j) }
-calculate_threats_about::proc(board:^Board,center_i,center_j:i8) {
-	i0:=max(0,center_i-CROC_WIGGLINESS+1)
-	i1:=min(center_i+CROC_WIGGLINESS-1,board.size.x-1)
-	j0:=max(0,center_j-CROC_WIGGLINESS+1)
-	j1:=min(center_j+CROC_WIGGLINESS-1,board.size.y-1)
-	for i in i0..=i1 do for j in j0..=j1 {
-		calculate_threats_at(board,i,j) }}
+	for kind in Entity_Kind {
+		threats_in:=clone_2d_slice(board.threats)
+		defer delete_2d_slice(threats_in)
+		for pos in board.entities {
+			entity,found:=board.cells[pos.x][pos.y].?
+			if !found do continue
+			if entity.kind!=kind do continue
+			fmt.println("putting threat on",pos,entity.kind)
+			board.threats[pos.x][pos.y]=(cast(i8)entity.kind)+1
+			// #partial switch kind {
+			// case .KROKUL: calculate_threats_krokul(pos,entity.direction,board.size,threats_in,board.threats)
+			// case .IGNESA: calculate_threats_ignesa(pos,entity.direction,board.size,threats_in,board.threats)
+			// case .BORDANA: calculate_threats_bordana(pos,entity.direction,board.size,threats_in,board.threats) }
+	}}}
+calculate_threats_krokul::proc(pos:[2]i8,direction:Compass,board_size:[2]i8,threats_in:[][]i8,threats_out:[][]i8) {
+	offsets:=[?][2]i8{{-1,0},{1,0},{0,-1},{0,1}}
+	for offset in offsets {
+		i:=pos.x+offset.x
+		j:=pos.y+offset.y
+		if (i<0)||(j<0)||(i>=board_size.x)||(j>=board_size.y) do continue
+		if ([2]i8{i,j}==pos) do continue
+		threats_out[i][j] += 1 }}
+calculate_threats_ignesa::proc(pos:[2]i8,direction:Compass,board_size:[2]i8,threats_in:[][]i8,threats_out:[][]i8) {
+	offsets_b:=[?][2]i8{
+		{-1,0},{0,-1},{0,1},{1,0} }
+	for offset in offsets_b {
+		i:=pos.x+offset.x
+		j:=pos.y+offset.y
+		if (i<0)||(j<0)||(i>=board_size.x)||(j>=board_size.y) do continue
+		if ([2]i8{i,j}==pos) do continue
+		threats_out[i][j] += 1 }
+	offsets_a:=[?][2]i8{
+		{-2,0},{2,0},{0,-2},{0,2},{-1,-1},{-1,0},{-1,1},{0,-1},{0,1},{1,-1},{1,0},{1,1} }
+	direction_offset:=DIRECTION_STEP[direction]
+	for offset in offsets_a {
+		i:=pos.x+offset.x+4*direction_offset.x
+		j:=pos.y+offset.y+4*direction_offset.y
+		if (i<0)||(j<0)||(i>=board_size.x)||(j>=board_size.y) do continue
+		if ([2]i8{i,j}==pos) do continue
+		threats_out[i][j] += 1 }}
+BORDANA_DESCRIPTION:string:"For every tile in a 5x5 square around Ignesa, increase threat by 1 if a neighboring tile has a threat greater than 0, or if a neighboring tile has this Bordana."
+// DICK
+calculate_threats_bordana::proc(pos:[2]i8,direction:Compass,board_size:[2]i8,threats_in:[][]i8,threats_out:[][]i8) {
+	points:=make_square(pos,2,board_size)
+	for point in points {
+		neighbor_points:=make_square(point,1,board_size)
+		ok:bool=false
+		for neighbor_point in neighbor_points do if ((threats_in[neighbor_point.x][neighbor_point.y]>0)||(neighbor_point==pos)) {
+			ok=true
+			break }
+		if ok do threats_out[point.x][point.y] += 1 }}
+// calculate_threats::proc(board:^Board) {
+// 	i,j:i8; board_iterator(&i,&j)
+// 	for iterate_board(board,&i,&j) {
+// 		board.threats[i][j]=calculate_threat(board,i,j)
+// 		board.estimated_threats[i][j]=calculate_estimated_threat(board,i,j) }}
+// calculate_threats_at::proc(board:^Board,i,j:i8) {
+// 	board.threats[i][j]=calculate_threat(board,i,j)
+// 	board.estimated_threats[i][j]=calculate_estimated_threat(board,i,j) }
+// calculate_threats_about::proc(board:^Board,center_i,center_j:i8) {
+// 	i0:=max(0,center_i-CROC_WIGGLINESS+1)
+// 	i1:=min(center_i+CROC_WIGGLINESS-1,board.size.x-1)
+// 	j0:=max(0,center_j-CROC_WIGGLINESS+1)
+// 	j1:=min(center_j+CROC_WIGGLINESS-1,board.size.y-1)
+// 	for i in i0..=i1 do for j in j0..=j1 {
+// 		calculate_threats_at(board,i,j) }}
 render_menu::proc() {
 	state.hovered_name=""
 	defer {
@@ -340,12 +430,10 @@ render_board::proc() {
 	board_iterator(&i,&j)
 	for iterate_board(board,&i,&j) {
 		threat:=board.threats[i][j]
-		estimated_threat:=board.estimated_threats[i][j]
 		ep:=entity_pos(f16(i),f16(j))
 		tp:[3]f32=state.view_matrix*[3]f32{f32(ep.x),f32(ep.y),1}
 		// TEMP
-		if (threat!=0)&&(!cell_occupied(board,i,j)) do render_text(fmt.aprint(threat),pos={f16(tp.x),f16(tp.y)},color=WHITE,spacing=0.5,font_name="font-medium",scale_multiplier=1.25+0.75*max(1-f16(linalg.length(state.cursor-[2]f32{tp.x,tp.y}))/(250*f16(state.view_zoom)),0.0))
-		// if (estimated_threat!=0)&&(board.vision[i][j]) do render_text(fmt.aprint(estimated_threat),pos={f16(tp.x),f16(tp.y)},color=WHITE,spacing=0.5,font_name="font-medium",scale_multiplier=1.25+0.75*max(1-f16(linalg.length(state.cursor-[2]f32{tp.x,tp.y}))/(250*f16(state.view_zoom)),0.0))
+		if (threat!=0)/*&&(!cell_occupied(board,i,j))*//*&&(board.vision[i][j])*/ do render_text(fmt.aprint(threat),pos={f16(tp.x),f16(tp.y)},color=WHITE,spacing=0.5,font_name="font-medium",scale_multiplier=1.25+0.75*max(1-f16(linalg.length(state.cursor-[2]f32{tp.x,tp.y}))/(250*f16(state.view_zoom)),0.0))
 		}
 	text_pos:=[2]f16{0,-0.5*f16(state.window_size.y)+8}
 	text_pos={-0.5*f16(state.window_size.x)+8,-0.5*f16(state.window_size.y)+8}
@@ -354,8 +442,15 @@ render_board::proc() {
 	render_text("F   mark croc",pos=text_pos,pivot={.WEST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
 	render_text("\"   reveal",pos=text_pos,pivot={.WEST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
 	render_text("#   look",pos=text_pos,pivot={.WEST,.SOUTH},font_name="font-medium",scale_multiplier=1.5)
+	text_pos={0.5*f16(state.window_size.x)-8,-0.5*f16(state.window_size.y)+8}
+	render_text("hide entities   E",pos=text_pos,pivot={.EAST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
+	render_text("reveal board   W",pos=text_pos,pivot={.EAST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
+	render_text("hide board   Q",pos=text_pos,pivot={.EAST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
+
+
+
 	text_pos={-0.5*f16(state.window_size.x)+8,0.5*f16(state.window_size.y)-8}
-	render_text("remaining crocs: ",fmt.aprint(len(board.crocs)-int(board.n_flags)),pos=text_pos,pivot={.WEST,.NORTH},font_name="font-medium",scale_multiplier=1.5)
+	render_text("remaining monsters: ",fmt.aprint(len(board.entities)-int(board.n_flags)),pos=text_pos,pivot={.WEST,.NORTH},font_name="font-medium",scale_multiplier=1.5)
 	text_pos={0.5*f16(state.window_size.x)-8,0.5*f16(state.window_size.y)-8}
 	render_text(fmt.aprintf("time: %.2f",state.play_time),pos=text_pos,pivot={.EAST,.NORTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y-=24
 	if state.highscores[int(board.difficulty)]!=math.F32_MAX do render_text(fmt.aprintf("highscore: %.2f",state.highscores[int(board.difficulty)]),pos=text_pos,pivot={.EAST,.NORTH},font_name="font-medium",scale_multiplier=1.5)
@@ -363,18 +458,23 @@ render_board::proc() {
 	if .VICTORIOUS in state.flags {
 		render_text("WINNER",pos=text_pos,color=WHITE,font_name="font-title",waviness=2.0,spacing=0.8)
 		if .HIGHSCORE_SET in state.flags do render_text("new highscore!",pos=text_pos+{0,-f16(state.resolution.y)+96},font_name="font-title",waviness=2.0,spacing=0.6) }
-	if .DEAD in state.flags do render_text("LOSER",pos=text_pos,color=WHITE,font_name="font-title",waviness=2.0,spacing=0.8) }
+	if .DEAD in state.flags do render_text("LOSER",pos=text_pos,color=WHITE,font_name="font-title",waviness=2.0,spacing=0.8)
+	pos:=[2]f16{0,-0.5*f16(state.window_size.y)+8+TILE_SIZE/2}
+	render_texture(name="krokul",pos=pos,size={TILE_SIZE,TILE_SIZE})
+}
 board_tick::proc() {
 	board:^Board=&state.board
-	if all_crocs_are_flagged(board) {
-		pause_timer(&state.play_timer)
-		state.flags+={.VICTORIOUS}
-		play_sound("victory")
-		time:=state.play_time
-		highscore:=state.highscores[int(board.difficulty)]
-		if time<=highscore {
-			state.flags+={.HIGHSCORE_SET}
-			state.highscores[int(board.difficulty)]=time }}}
+	// TEMP
+	// if all_entities_are_flagged(board) {
+	// 	pause_timer(&state.play_timer)
+	// 	state.flags+={.VICTORIOUS}
+	// 	play_sound("victory")
+	// 	time:=state.play_time
+	// 	highscore:=state.highscores[int(board.difficulty)]
+	// 	if time<=highscore {
+	// 		state.flags+={.HIGHSCORE_SET}
+	// 		state.highscores[int(board.difficulty)]=time }}
+}
 game_tick::proc() {
 	state.keys_switched=state.keys_pressed~state.old_keys_pressed
 	state.mouse_switched=state.mouse_pressed~state.old_mouse_pressed
@@ -437,14 +537,17 @@ game_tick::proc() {
 		if mouse_was_released(.MOUSE_LEFT) do submenu^=.NONE
 		case .GAME:
 		if key_was_pressed(.ESCAPE) do start_menu()
+		// TEMP
+		// if key_was_pressed(.R) do start_level(state.board.difficulty)
 		if key_was_pressed(.R) do init_board(state.board.difficulty)
 		switch (.DEAD in state.flags)||(.VICTORIOUS in state.flags) {
 			case false:
 			if mouse_pressed(.MOUSE_LEFT) {
 				click_pos:=state.hovered_pos
 				if board.untouched {
-					if cell_occupied(board,click_pos.x,click_pos.y) do despawn_croc(board,click_pos.x,click_pos.y)
-					when AREAL_FIRST_CLEAR do for croc in board.crocs do if cells_distance(croc.x,croc.y,click_pos.x,click_pos.y)<=CROC_WIGGLINESS do despawn_croc(board,croc.x,croc.y)
+					// DICK
+					if cell_occupied(board,click_pos.x,click_pos.y) do despawn_entity(board,click_pos.x,click_pos.y)
+					when AREAL_FIRST_CLEAR do for entity in board.entities do if cells_distance(entity.x,entity.y,click_pos.x,click_pos.y)<=CROC_WIGGLINESS do despawn_entity(board,entity.x,entity.y)
 				}
 				if !board.flags[click_pos.x][click_pos.y] do if reveal_cell(board,click_pos.x,click_pos.y) {
 					switch rand.int31_max(10) {
@@ -463,14 +566,21 @@ game_tick::proc() {
 					 } board_tick() }
 			if key_was_pressed(.F) {
 				result:=!board.flags[state.hovered_pos.x][state.hovered_pos.y]
-				if result&&(int(board.n_flags)<len(board.crocs)) {
+				if result&&(int(board.n_flags)<len(board.entities)) {
 					board.flags[state.hovered_pos.x][state.hovered_pos.y]=result
 					board.n_flags+=1 }
 				if !result {
 					board.flags[state.hovered_pos.x][state.hovered_pos.y]=result
 					board.n_flags-=1 }
-				calculate_threats_about(board,state.hovered_pos.x,state.hovered_pos.y)
 				board_tick() }
+			if key_pressed(.Q) {
+				board_set_vision(&state.board,false) }
+			if key_pressed(.W) {
+				board_set_vision(&state.board,true) }
+			if key_pressed(.E) {
+				board_set_vision(&state.board,true)
+				hide_entities(&state.board)
+				hide_semienclosed(&state.board) }
 			case true: }}
 	state.view_zoom+=8*f16(state.frame_time)*(state.view_zoom_pivot-state.view_zoom)
 	state.mouse_delta={0,0}
@@ -485,11 +595,11 @@ reveal_cell::proc(board:^Board,i,j:i8)->(revealed:bool) {
 	if board.flags[i][j] do return false
 	if board.vision[i][j] do return false
 	board.vision[i][j]=true
-	calculate_threats_at(board,i,j)
-	if distance_to_croc(board,i,j)<=KILL_DISTANCE {
+	if distance_to_entity(board,i,j)<=KILL_DISTANCE {
 		state.flags+={.DEAD}
 		play_sound("defeat") }
-	when REVEAL_BASED_ON_ESTIMATED_THREAT { if board.estimated_threats[i][j]==0 do reveal_adjacent(board,i,j) }
+	// TEMP
+	when REVEAL_BASED_ON_ESTIMATED_THREAT { if board.threats[i][j]==0 do reveal_adjacent(board,i,j) }
 	else { if board.threats[i][j]==0 do reveal_adjacent(board,i,j) }
 	return true }
 reveal_adjacent::proc(board:^Board,i,j:i8) {
@@ -498,10 +608,12 @@ reveal_adjacent::proc(board:^Board,i,j:i8) {
 	reveal_cell(board,i,j-1)
 	reveal_cell(board,i,j+1) }
 start_menu::proc() {
+	fmt.println("STARTING MENU")
 	state.control_state.screen=.MENU
 	init_board(.EASY)
 	init_view() }
 start_level::proc(difficulty:Difficulty) {
+	fmt.println("STARTING LEVEL")
 	state.control_state.screen=.GAME
 	init_board(difficulty)
 	init_view() }
