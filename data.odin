@@ -11,6 +11,7 @@ import "vendor:miniaudio"
 import gl "vendor:OpenGL"
 import fs "vendor:fontstash"
 BOUNDED_RUNTIME::#config(BOUNDED_RUNTIME,false)
+TRANSPARENT:[4]f16:{0,0,0,0}
 BLACK:[4]f16:{0,0,0,1}
 WHITE:[4]f16:{1,1,1,1}
 YELLOW:[4]f16:{1,1,0,1}
@@ -140,9 +141,10 @@ State::struct {
 	play_time:f32,
 	frame_time:f32,
 	hover_time:f32,
-	// (TODO): Make an "icons_and_text" render buffer and apply an outline to it.
-	default_sb:Render_Buffer,
-	bloom_sb:Render_Buffer }
+	default_render_buffer:Render_Buffer,
+	bloom_render_buffer:Render_Buffer,
+	icons_and_text_render_buffer:Render_Buffer,
+	current_render_buffer:^Render_Buffer }
 Texture_Draw_Command::struct {
 	pos:[2]f32,
 	size:[2]f32,
@@ -229,7 +231,7 @@ Blur_Shader::struct {
 	resolution,step:i32 }
 Outline_Shader::struct {
 	using shader:Shader,
-	resolution,size:i32 }
+	resolution,size,stroke_color:i32 }
 Blend_Shader::struct {
 	using shader:Shader }
 Glyph_Shader::struct {

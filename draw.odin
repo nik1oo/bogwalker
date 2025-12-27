@@ -64,13 +64,16 @@ init_gl::proc() {
 polygon_mode::proc(mode:u32) {
 	gl.PolygonMode(gl.FRONT_AND_BACK,mode) }
 select_render_buffer::proc(render_buffer:^Render_Buffer) {
+	state.current_render_buffer=render_buffer
 	gl.BindFramebuffer(gl.FRAMEBUFFER,u32(render_buffer.frame_buffer_handle))
 	gl.Viewport(0,0,i32(state.resolution.x),i32(state.resolution.y)) }
-clear_render_buffer::proc(render_buffer:^Render_Buffer) {
+clear_render_buffer::proc(render_buffer:^Render_Buffer,color:[4]f16) {
+	gl.ClearColor(cast(f32)color.r,cast(f32)color.g,cast(f32)color.b,cast(f32)color.a)
 	gl.BindFramebuffer(gl.FRAMEBUFFER,u32(render_buffer.frame_buffer_handle))
 	gl.Clear(gl.COLOR_BUFFER_BIT)
 	gl.Clear(gl.DEPTH_BUFFER_BIT) }
 select_frame_buffer::proc(frame_buffer_handle:u32) {
+	state.current_render_buffer=nil
 	gl.BindFramebuffer(gl.FRAMEBUFFER,frame_buffer_handle)
 	gl.Viewport(0,0,i32(state.window_size.x),i32(state.window_size.y)) }
 clear_frame_buffer::proc(frame_buffer_handle:u32) {
@@ -217,10 +220,15 @@ render_blur::proc(render_buffer:^Render_Buffer,step:i8) {
 	set_shader_param(state.blur_shader.step,i32(step))
 	bind_texture(0,render_buffer.texture_handle)
 	draw_triangles(6,depth_test=false) }
-render_outline::proc(render_buffer:^Render_Buffer,size:u8) {
+render_outline::proc(render_buffer:^Render_Buffer,stroke_color:[4]f16,size:u8) {
 	use_shader(state.outline_shader)
 	set_shader_param(state.outline_shader.resolution,la.array_cast(state.resolution,f32))
 	set_shader_param(state.outline_shader.size,i32(size))
+	set_shader_param(state.outline_shader.stroke_color,la.array_cast(stroke_color,f32))
+	bind_texture(0,render_buffer.texture_handle)
+	draw_triangles(6,depth_test=false) }
+render_render_buffer::proc(render_buffer:^Render_Buffer) {
+	use_shader(state.buffer_shader)
 	bind_texture(0,render_buffer.texture_handle)
 	draw_triangles(6,depth_test=false) }
 render_rect::proc(rect:Rect(f16),color:[4]f32,rounding:f32,depth:f32) {
@@ -330,10 +338,10 @@ resolution_callback::proc"c"(window:glfw.WindowHandle,width,height:i32) {
 	state.window_size=[2]u16{u16(width),u16(height)}
 	state.resolution=state.window_size
 	gl.Viewport(0,0,i32(state.window_size.x),i32(state.window_size.y))
-	delete_render_buffer(&state.default_sb)
-	delete_render_buffer(&state.bloom_sb)
-	init_render_buffer(&state.default_sb,state.window_size,gl.RGBA8,gl.RGBA)
-	init_render_buffer(&state.bloom_sb,state.window_size,gl.RGBA8,gl.RGBA)
+	delete_render_buffer(&state.default_render_buffer)
+	delete_render_buffer(&state.bloom_render_buffer)
+	init_render_buffer(&state.default_render_buffer,state.window_size,gl.RGBA8,gl.RGBA)
+	init_render_buffer(&state.bloom_render_buffer,state.window_size,gl.RGBA8,gl.RGBA)
 	state.settings.window_size=(state.settings.display==.WINDOWED)?state.window_size:DEFAULT_WINDOW_SIZE
 	use_shader(state.texture_shader)
 	set_shader_param(state.texture_shader.resolution,la.array_cast(state.resolution,f32))
@@ -376,19 +384,23 @@ init_draw::proc() {
 	init_shaders()
 	init_fontstash()
 	use_shader(state.texture_shader)
-	init_render_buffer(&state.default_sb,state.window_size,gl.RGBA8,gl.RGBA)
-	init_render_buffer(&state.bloom_sb,state.window_size,gl.RGBA8,gl.RGBA) }
+	init_render_buffer(&state.default_render_buffer,state.window_size,gl.RGBA8,gl.RGBA)
+	init_render_buffer(&state.bloom_render_buffer,state.window_size,gl.RGBA8,gl.RGBA)
+	init_render_buffer(&state.icons_and_text_render_buffer,state.window_size,gl.RGBA8,gl.RGBA) }
 destroy_renderer::proc() {
-	delete_render_buffer(&state.default_sb)
-	delete_render_buffer(&state.bloom_sb)
+	delete_render_buffer(&state.default_render_buffer)
+	delete_render_buffer(&state.bloom_render_buffer)
+	delete_render_buffer(&state.icons_and_text_render_buffer)
 	glfw.DestroyWindow(state.window)
 	glfw.Terminate() }
 draw_tick::proc() {
 	state.texture_draw_commands=make_map_cap(map[string]#soa[dynamic]Texture_Draw_Command,capacity=TEXTURE_GROUPS_CAP,allocator=context.allocator)
 	state.text_draw_commands=make_map_cap(map[string]#soa[dynamic]Text_Draw_Command,capacity=TEXT_GROUPS_CAP,allocator=context.allocator)
 	clear_frame_buffer(0)
-	clear_render_buffer(&state.default_sb)
-	select_render_buffer(&state.default_sb)
+	gl.ClearColor(0,0,0,1)
+	clear_render_buffer(&state.default_render_buffer,BLACK)
+	clear_render_buffer(&state.icons_and_text_render_buffer,TRANSPARENT)
+	select_render_buffer(&state.default_render_buffer)
 	use_shader(state.texture_shader)
 	set_shader_param(state.texture_shader.time,f32(state.net_time))
 	set_shader_param(state.texture_shader.view_matrix,&state.view_matrix)
@@ -397,13 +409,17 @@ draw_tick::proc() {
 	case .GAME: render_board()
 	case .MENU: render_menu() }
 	render_texture_groups()
-	select_render_buffer(&state.bloom_sb)
-	render_bloom_threshold(&state.default_sb)
-	render_blur(&state.bloom_sb,1)
-	render_blur(&state.bloom_sb,2)
-	render_blur(&state.bloom_sb,4)
+	select_render_buffer(&state.bloom_render_buffer)
+	render_bloom_threshold(&state.default_render_buffer)
+	render_blur(&state.bloom_render_buffer,1)
+	render_blur(&state.bloom_render_buffer,2)
+	render_blur(&state.bloom_render_buffer,4)
 	select_frame_buffer(0)
-	render_bloom(&state.default_sb,&state.bloom_sb)
+	render_bloom(&state.default_render_buffer,&state.bloom_render_buffer)
+	select_render_buffer(&state.icons_and_text_render_buffer)
+	render_outline(&state.icons_and_text_render_buffer,BLACK,2)
+	select_frame_buffer(0)
+	render_render_buffer(&state.icons_and_text_render_buffer)
 	for name,_ in state.text_draw_commands do render_text_group(name)
 	swap_buffers() }
 get_windowed_mode_resolution::proc()->[2]u16 {

@@ -60,6 +60,9 @@ render_textf::proc(format:string,args:..any,pos:[2]f16={0,0},color:[4]f16=WHITE,
 	text:=fmt.aprintf(format,..args)
 	_render_text(text,pos,color,pivot) }
 _render_text::proc(text:string,pos:[2]f16,color:[4]f16=WHITE,pivot:bit_set[Compass]={}) {
+	prev_render_buffer:=state.current_render_buffer
+	defer select_render_buffer(prev_render_buffer)
+	select_render_buffer(&state.icons_and_text_render_buffer)
 	pos:=pos
 	render_point(pos,3,{1,0,0},depth=0.0)
 	rect:Rect(f16)=text_rect(text,pos)
