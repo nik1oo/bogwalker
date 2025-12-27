@@ -53,13 +53,6 @@ nth_line::proc(text:string,target_line:int)->(res:string) {
 			cap:=strings.index_rune(text[i+1:],'\n')
 			return text[i:i+cap+1] } }
 	return "" }
-cast_array::proc{cast_array2,cast_array3,cast_array4}
-cast_array4::proc "fastcall"(x:[4]$T1,$T2:typeid)->(y:[4]T2) {
-	return[4]T2{T2(x[0]),T2(x[1]),T2(x[2]),T2(x[3])} }
-cast_array3::proc "fastcall"(x:[3]$T1,$T2:typeid)->(y:[3]T2) {
-	return[3]T2{T2(x[0]),T2(x[1]),T2(x[2])} }
-cast_array2::proc "fastcall"(x:[2]$T1,$T2:typeid)->(y:[2]T2) {
-	return[2]T2{T2(x[0]),T2(x[1])} }
 name_from_path::proc(path:string)->string {
 	return strings.clone(filepath.stem(filepath.base(path))) }
 in_range::proc { in_range_int,in_range_f32,in_range_2int,in_range_2f32 }

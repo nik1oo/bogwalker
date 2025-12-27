@@ -64,6 +64,8 @@ Flags::bit_set[enum{INPUT_RECEIVED,AUDIO_MENU_DRAWN,HIGHSCORE_SET,DEAD,VICTORIOU
 entity_names:map[Entity_Kind]string
 matrix3_identity:=linalg.MATRIX3F32_IDENTITY
 State::struct {
+	font_atlas_handle:u32,
+	glyph_infos:map[rune]Glyph_Info,
 	marker_kind:Entity_Kind,
 	flags:Flags,
 	texture_draw_commands:map[string]#soa[dynamic]Texture_Draw_Command,
@@ -123,6 +125,8 @@ State::struct {
 	blend_shader:^Blend_Shader,
 	font_shader:^Font_Shader,
 	rect_shader:^Rect_Shader,
+	glyph_shader:^Glyph_Shader,
+	point_shader:^Point_Shader,
 	frame_count:u64,
 	tick_count:u64,
 	fps:f32,
@@ -205,36 +209,13 @@ Shader::struct {
 	last_compile_time:time.Time }
 Font_Shader::struct {
 	using shader:Shader,
-	symbol:i32,
-	pos:i32,
-	this_buffer_res:i32,
-	symbol_size:i32,
-	text_color:i32,
-	scale_multiplier:i32 }
+	symbol,pos,this_buffer_res,symbol_size,text_color,scale_multiplier:i32 }
 Rect_Shader::struct {
 	using shader:Shader,
-	pos:i32,
-	size:i32,
-	fill_color:i32,
-	resolution:i32,
-	rounding:i32,
-	depth:i32 }
+	pos,size,fill_color,resolution,rounding,depth:i32 }
 Texture_Shader::struct {
 	using shader:Shader,
-	pos:i32,
-	size:i32,
-	rotation:i32,
-	resolution:i32,
-	depth:i32,
-	time:i32,
-	flip_y:i32,
-	lightness:i32,
-	view_matrix:i32,
-	view_zoom:i32,
-	rotation_matrix:i32,
-	waves:i32,
-	caustics:i32,
-	windy:i32 }
+	pos,size,rotation,resolution,depth,time,flip_y,lightness,view_matrix,view_zoom,rotation_matrix,waves,caustics,windy:i32 }
 Buffer_Shader::struct {
 	using shader:Shader }
 Bloom_Threshold_Shader::struct {
@@ -244,10 +225,15 @@ Bloom_Shader::struct {
 	using shader:Shader }
 Blur_Shader::struct {
 	using shader:Shader,
-	resolution:i32,
-	step:i32 }
+	resolution,step:i32 }
 Blend_Shader::struct {
 	using shader:Shader }
+Glyph_Shader::struct {
+	using shader:Shader,
+	pos,size,resolution,s0,s1,t0,t1,fill_color:i32 }
+Point_Shader::struct {
+	using shader:Shader,
+	pos,resolution,point_color,depth:i32 }
 Space::enum u8 { WORLD,SCREEN }
 Mouse_Button::enum u8 { MOUSE_LEFT,MOUSE_RIGHT }
 Key::enum u8 { Q,W,E,F,R,ESCAPE,SPACE,ONE,TWO,THREE }
@@ -293,54 +279,54 @@ init_data::proc() {
 	state.vertex_buffers=make([dynamic]u32)
 	state.control_state.screen=.MENU }
 init_assets::proc() {
-	read_and_load_texture("./images/bottom-1.png")
-	read_and_load_texture("./images/bottom-2.png")
-	read_and_load_texture("./images/bottom-3.png")
-	read_and_load_texture("./images/bottom-4.png")
-	read_and_load_texture("./images/surface-1.png")
-	read_and_load_texture("./images/surface-2.png")
-	read_and_load_texture("./images/surface-3.png")
-	read_and_load_texture("./images/surface-4.png")
-	read_and_load_texture("./images/croc-head.png")
-	read_and_load_texture("./images/croc-tail.png")
-	read_and_load_texture("./images/fish.png")
-	read_and_load_texture("./images/fishes.png")
-	read_and_load_texture("./images/crab.png")
-	read_and_load_texture("./images/line-1.png")
-	read_and_load_texture("./images/line-2.png")
-	read_and_load_texture("./images/line-3.png")
-	read_and_load_texture("./images/line-4.png")
-	read_and_load_texture("./images/whiteline-1.png")
-	read_and_load_texture("./images/whiteline-2.png")
-	read_and_load_texture("./images/whiteline-3.png")
-	read_and_load_texture("./images/whiteline-4.png")
-	read_and_load_texture("./images/whiteline-end.png")
-	read_and_load_texture("./images/start.png")
-	read_and_load_texture("./images/display.png")
-	read_and_load_texture("./images/audio.png")
-	read_and_load_texture("./images/exit.png")
-	read_and_load_texture("./images/lotus.png")
-	read_and_load_texture("./images/iris.png")
-	read_and_load_texture("./images/marigold.png")
-	read_and_load_texture("./images/lily.png")
-	read_and_load_texture("./images/buoy.png")
-	read_and_load_texture("./images/title-0.png")
-	read_and_load_texture("./images/title-1.png")
-	read_and_load_texture("./images/krokul.png")
-	read_and_load_texture("./images/ignesa.png")
-	read_and_load_texture("./images/grendul.png")
-	read_and_load_texture("./images/bordana.png")
-	read_and_load_texture("./images/nokur.png")
-	read_and_load_texture("./images/backa.png")
-	read_and_load_texture("./images/vondul.png")
-	read_and_load_texture("./images/rusalka.png")
-	read_and_load_texture("./images/durrul.png")
-	read_and_load_texture("./images/bragul.png")
-	read_and_load_texture("./images/drakul.png")
-	read_and_load_texture("./images/moosul.png")
-	read_and_load_texture("./images/rihtul.png")
-	read_and_load_texture("./images/trul.png")
-	read_and_load_texture("./images/hero.png")
+	load_texture_from_filepath("./images/bottom-1.png")
+	load_texture_from_filepath("./images/bottom-2.png")
+	load_texture_from_filepath("./images/bottom-3.png")
+	load_texture_from_filepath("./images/bottom-4.png")
+	load_texture_from_filepath("./images/surface-1.png")
+	load_texture_from_filepath("./images/surface-2.png")
+	load_texture_from_filepath("./images/surface-3.png")
+	load_texture_from_filepath("./images/surface-4.png")
+	load_texture_from_filepath("./images/croc-head.png")
+	load_texture_from_filepath("./images/croc-tail.png")
+	load_texture_from_filepath("./images/fish.png")
+	load_texture_from_filepath("./images/fishes.png")
+	load_texture_from_filepath("./images/crab.png")
+	load_texture_from_filepath("./images/line-1.png")
+	load_texture_from_filepath("./images/line-2.png")
+	load_texture_from_filepath("./images/line-3.png")
+	load_texture_from_filepath("./images/line-4.png")
+	load_texture_from_filepath("./images/whiteline-1.png")
+	load_texture_from_filepath("./images/whiteline-2.png")
+	load_texture_from_filepath("./images/whiteline-3.png")
+	load_texture_from_filepath("./images/whiteline-4.png")
+	load_texture_from_filepath("./images/whiteline-end.png")
+	load_texture_from_filepath("./images/start.png")
+	load_texture_from_filepath("./images/display.png")
+	load_texture_from_filepath("./images/audio.png")
+	load_texture_from_filepath("./images/exit.png")
+	load_texture_from_filepath("./images/lotus.png")
+	load_texture_from_filepath("./images/iris.png")
+	load_texture_from_filepath("./images/marigold.png")
+	load_texture_from_filepath("./images/lily.png")
+	load_texture_from_filepath("./images/buoy.png")
+	load_texture_from_filepath("./images/title-0.png")
+	load_texture_from_filepath("./images/title-1.png")
+	load_texture_from_filepath("./images/krokul.png")
+	load_texture_from_filepath("./images/ignesa.png")
+	load_texture_from_filepath("./images/grendul.png")
+	load_texture_from_filepath("./images/bordana.png")
+	load_texture_from_filepath("./images/nokur.png")
+	load_texture_from_filepath("./images/backa.png")
+	load_texture_from_filepath("./images/vondul.png")
+	load_texture_from_filepath("./images/rusalka.png")
+	load_texture_from_filepath("./images/durrul.png")
+	load_texture_from_filepath("./images/bragul.png")
+	load_texture_from_filepath("./images/drakul.png")
+	load_texture_from_filepath("./images/moosul.png")
+	load_texture_from_filepath("./images/rihtul.png")
+	load_texture_from_filepath("./images/trul.png")
+	load_texture_from_filepath("./images/hero.png")
 	load_font("./images/font.png")
 	load_font("./images/font-title.png")
 	load_font("./images/font-huge.png")

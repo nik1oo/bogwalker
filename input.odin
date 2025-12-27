@@ -4,6 +4,7 @@ import "base:runtime"
 import "vendor:glfw"
 import "core:math"
 import "core:fmt"
+import la "core:math/linalg"
 keymap:map[i32]Key = {
 	'Q'=Key.Q,
 	'W'=Key.W,
@@ -42,7 +43,7 @@ cursor_pos_callback::proc"c"(window:glfw.WindowHandle,x,y:f64) {
 	// 	state.mouse_delta={0,0} }
 	state.mouse_pos=mouse_pos
 	if state.control_state.screen==.GAME do if (mouse_pressed(.MOUSE_RIGHT)||key_pressed(.SPACE)) {
-		state.view_pan+=cast_array(state.mouse_delta,f16)/state.view_zoom }
+		state.view_pan+=la.array_cast(state.mouse_delta,f16)/state.view_zoom }
 	state.cursor+=state.mouse_delta/f32(state.view_zoom)
 	state.cursor=mouse_pos-{f32(state.window_size.x)/2,f32(state.window_size.y)/2}
 	state.cursor.x=min(max(state.cursor.x,-f32(state.window_size.x)/2),f32(state.window_size.x)/2)

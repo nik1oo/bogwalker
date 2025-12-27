@@ -6,7 +6,7 @@ import gl "vendor:OpenGL"
 import "core:fmt"
 import "core:os"
 import "core:math"
-import "core:math/linalg"
+import la "core:math/linalg"
 import "core:path/filepath"
 import "core:reflect"
 import "core:strings"
@@ -55,6 +55,7 @@ init_gl::proc() {
 	gl.ClearColor(0,0,0,1)
 	polygon_mode(gl.FILL)
 	gl.Enable(gl.DEPTH_TEST)
+	gl.Enable(gl.POINT_SMOOTH)
 	gl.DepthFunc(gl.LESS)
 	gl.FrontFace(gl.CW)
 	gl.Disable(gl.CULL_FACE)
@@ -119,7 +120,7 @@ get_shader_param_handle::proc(shader_handle:u32,param_name:string)->(handle:i32)
 	handle=gl.GetUniformLocation(shader_handle,cstr)
 	delete(cstr)
 	return handle }
-UNIT_MATRIX::linalg.MATRIX3F32_IDENTITY
+UNIT_MATRIX::la.MATRIX3F32_IDENTITY
 pan_matrix::proc(offset:[2]f32)->matrix[3,3]f32 {
 	return matrix[3,3]f32 {
 		1,0,offset.x,
@@ -127,8 +128,8 @@ pan_matrix::proc(offset:[2]f32)->matrix[3,3]f32 {
 		0,0,1 }}
 rotate_matrix::proc(angle:f32)->matrix[3,3]f32 {
 	return matrix[3,3]f32 {
-		linalg.cos(angle),-linalg.sin(angle),0,
-		linalg.sin(angle),linalg.cos(angle),0,
+		la.cos(angle),-la.sin(angle),0,
+		la.sin(angle),la.cos(angle),0,
 		0,0,1 }}
 zoom_matrix::proc(zoom:f32)->matrix[3,3]f32 {
 	return matrix[3,3]f32 {
@@ -185,7 +186,7 @@ set_shader_param_matrix_4f::#force_inline proc(param_handle:i32,value:^matrix[4,
 	gl.UniformMatrix4fv(param_handle,1,false,&value[0][0]) }
 set_shader_param::proc{set_shader_param_1f32,set_shader_param_2f32,set_shader_param_3f32,set_shader_param_4f32,set_shader_param_1i32,set_shader_param_1i16,set_shader_param_1i8,set_shader_param_1u32,set_shader_param_1u16,set_shader_param_1u8,set_shader_param_2i32,set_shader_param_2i16,set_shader_param_2i8,set_shader_param_2u32,set_shader_param_2u16,set_shader_param_2u8,set_shader_param_3i32,set_shader_param_3i16,set_shader_param_3i8,set_shader_param_3u32,set_shader_param_3u16,set_shader_param_3u8,set_shader_param_matrix_3f,set_shader_param_matrix_4f}
 bind_texture::proc(binding_point:u32,handle:u32) {
-	gl.ActiveTexture(binding_point)
+	gl.ActiveTexture(gl.TEXTURE0+binding_point)
 	gl.BindTexture(gl.TEXTURE_2D,u32(handle)) }
 draw_triangles::proc(count:i32,depth_test:bool) {
 	set_depth_test(depth_test)
@@ -209,7 +210,7 @@ render_text_group::proc(name:string) {
 	commands,ok:=&state.text_draw_commands[name]; if !ok do return
 	n:=len(commands); if n==0 do return
 	font:=&state.fonts[name]
-	set_shader_param(state.font_shader.this_buffer_res,cast_array(state.resolution,f32))
+	set_shader_param(state.font_shader.this_buffer_res,la.array_cast(state.resolution,f32))
 	set_shader_param(state.font_shader.symbol_size,[2]f32{f32(font.symbol_size.x),f32(font.symbol_size.y)})
 	bind_vertex_array(0)
 	i:int=0
@@ -217,34 +218,42 @@ render_text_group::proc(name:string) {
 	upload_vertex_buffer_data(Attribute_Index(i),VBO_Index(i),gl.FLOAT,&commands.positions[0],n); i+=1
 	upload_vertex_buffer_data(Attribute_Index(i),VBO_Index(i),gl.FLOAT,&commands.scale_factors[0],n); i+=1
 	upload_vertex_buffer_data(Attribute_Index(i),VBO_Index(i),gl.FLOAT,&commands.colors[0],n)
-	bind_texture(gl.TEXTURE0,state.textures[font.name].handle)
+	bind_texture(0,state.textures[font.name].handle)
 	texture_filtering(gl.NEAREST)
 	draw_triangles(i32(6*n),depth_test=true) }
 render_bloom_threshold::proc(render_buffer:^Render_Buffer) {
 	use_shader(state.bloom_threshold_shader)
-	bind_texture(gl.TEXTURE0,render_buffer.texture_handles[0])
+	bind_texture(0,render_buffer.texture_handles[0])
 	draw_triangles(6,depth_test=false) }
 render_blur::proc(render_buffer:^Render_Buffer,step:i8) {
 	use_shader(state.blur_shader)
-	set_shader_param(state.blur_shader.resolution,cast_array(state.resolution,f32))
+	set_shader_param(state.blur_shader.resolution,la.array_cast(state.resolution,f32))
 	set_shader_param(state.blur_shader.step,i32(step))
-	bind_texture(gl.TEXTURE0,render_buffer.texture_handles[0])
+	bind_texture(0,render_buffer.texture_handles[0])
 	draw_triangles(6,depth_test=false) }
 render_rect::proc(rect:Rect(f16),color:[4]f32,rounding:f32,depth:f32) {
 	use_shader(state.rect_shader)
-	set_shader_param(state.rect_shader.resolution,cast_array(state.resolution,f32))
-	set_shader_param(state.rect_shader.pos,cast_array(rect.pos,f32))
-	set_shader_param(state.rect_shader.size,cast_array(rect.size,f32))
+	set_shader_param(state.rect_shader.resolution,la.array_cast(state.resolution,f32))
+	set_shader_param(state.rect_shader.pos,la.array_cast(rect.pos,f32))
+	set_shader_param(state.rect_shader.size,la.array_cast(rect.size,f32))
 	set_shader_param(state.rect_shader.fill_color,color)
 	set_shader_param(state.rect_shader.rounding,rounding)
 	set_shader_param(state.rect_shader.depth,depth)
 	draw_triangles(6,depth_test=true) }
+render_point::proc(pos:[2]f16,size:f16,color:[3]f32,depth:f32) {
+	gl.UseProgram(state.point_shader.handle)
+	gl.PointSize(auto_cast size)
+	set_shader_param(state.point_shader.pos,la.array_cast(pos,f32))
+	set_shader_param(state.point_shader.resolution,la.array_cast(state.resolution,f32))
+	set_shader_param(state.point_shader.point_color,color)
+	set_shader_param(state.point_shader.depth,depth)
+	draw_points(1,depth_test=true) }
 render_bloom::proc(base_render_buffer:^Render_Buffer,bloom_render_buffer:^Render_Buffer) {
 	use_shader(state.bloom_shader)
 	// TEMP
 	// set_shader_param(state.bloom_shader.grayscale,i32(.DEAD in state.flags))
-	bind_texture(gl.TEXTURE0,base_render_buffer.texture_handles[0])
-	bind_texture(gl.TEXTURE1,bloom_render_buffer.texture_handles[0])
+	bind_texture(0,base_render_buffer.texture_handles[0])
+	bind_texture(1,bloom_render_buffer.texture_handles[0])
 	draw_triangles(6,depth_test=false) }
 init_shader_params::proc($Type:typeid,shader:^Type) {
 	field_names:=reflect.struct_field_names(Type)
@@ -271,15 +280,17 @@ init_shader::proc(name:string,$Type:typeid,$vert_name:string,$frag_name:string)-
 	return shader }
 init_shaders::proc() {
 	state.shaders=make([dynamic]^Shader,0,7)
-	state.texture_shader=init_shader("texture",Texture_Shader,"./shaders/vtexture.glsl","./shaders/ftexture.glsl"); assert(state.texture_shader!=nil)
-	state.buffer_shader=init_shader("buffer",Buffer_Shader,"./shaders/vfill.glsl","./shaders/fbuffer.glsl"); assert(state.buffer_shader!=nil)
-	state.bloom_threshold_shader=init_shader("bloom-threshold",Bloom_Threshold_Shader,"./shaders/vfill.glsl","./shaders/fbloom_threshold.glsl"); assert(state.bloom_threshold_shader!=nil)
-	state.blur_shader=init_shader("blur",Blur_Shader,"./shaders/vfill.glsl","./shaders/fblur.glsl"); assert(state.blur_shader!=nil)
-	state.bloom_shader=init_shader("bloom",Bloom_Shader,"./shaders/vfill.glsl","./shaders/fbloom.glsl"); assert(state.bloom_shader!=nil)
-	state.font_shader=init_shader("font",Font_Shader,"./shaders/vfont.glsl","./shaders/ffont.glsl"); assert(state.font_shader!=nil)
-	state.rect_shader=init_shader("rect",Rect_Shader,"./shaders/vrect.glsl","./shaders/frect.glsl"); assert(state.rect_shader!=nil)
+	state.texture_shader=init_shader("texture",Texture_Shader,"./shaders/vtexture.glsl","./shaders/ftexture.glsl")
+	state.buffer_shader=init_shader("buffer",Buffer_Shader,"./shaders/vfill.glsl","./shaders/fbuffer.glsl")
+	state.bloom_threshold_shader=init_shader("bloom-threshold",Bloom_Threshold_Shader,"./shaders/vfill.glsl","./shaders/fbloom_threshold.glsl")
+	state.blur_shader=init_shader("blur",Blur_Shader,"./shaders/vfill.glsl","./shaders/fblur.glsl")
+	state.bloom_shader=init_shader("bloom",Bloom_Shader,"./shaders/vfill.glsl","./shaders/fbloom.glsl")
+	state.font_shader=init_shader("font",Font_Shader,"./shaders/vfont.glsl","./shaders/ffont.glsl")
+	state.rect_shader=init_shader("rect",Rect_Shader,"./shaders/vrect.glsl","./shaders/frect.glsl")
+	state.glyph_shader=init_shader("glyph",Glyph_Shader,"./shaders/vglyph.glsl","./shaders/fglyph.glsl")
+	state.point_shader=init_shader("point",Point_Shader,"./shaders/vpoint.glsl","./shaders/fpoint.glsl")
 	use_shader(state.texture_shader)
-	set_shader_param(state.texture_shader.resolution,cast_array(state.resolution,f32)) }
+	set_shader_param(state.texture_shader.resolution,la.array_cast(state.resolution,f32)) }
 print_glsl_error::proc(message:string,message_type:gl.Shader_Type,shader:^Shader,vert_string:string,frag_string:string) {
 	content:string
 	#partial switch message_type {
@@ -332,12 +343,12 @@ resolution_callback::proc"c"(window:glfw.WindowHandle,width,height:i32) {
 	state.bloom_sb=make_render_buffer_static(state.window_size,1,{gl.RGBA8},{gl.RGBA}); assert(state.bloom_sb!=nil)
 	state.settings.window_size=(state.settings.display==.WINDOWED)?state.window_size:DEFAULT_WINDOW_SIZE
 	use_shader(state.texture_shader)
-	set_shader_param(state.texture_shader.resolution,cast_array(state.resolution,f32))
+	set_shader_param(state.texture_shader.resolution,la.array_cast(state.resolution,f32))
 	init_view()	}
 error_callback::proc"c"(source:u32,type:u32,id:u32,severity:u32,length:i32,message:cstring,userParam:rawptr) {
 	context=runtime.default_context()
 	if severity>gl.DEBUG_SEVERITY_NOTIFICATION do fmt.println(source,type,id,severity,length,message) }
-render_text::proc(args:..any,sep:string="",pos:[2]f16={0,0},color:[4]f16=WHITE,scale_multiplier:f16=1.0,pivot:bit_set[Compass]={},font_name:string="font-medium",shadow:bool=true,spacing:f16=1.0,waviness:f16=0.0) {
+_render_text::proc(args:..any,sep:string="",pos:[2]f16={0,0},color:[4]f16=WHITE,scale_multiplier:f16=1.0,pivot:bit_set[Compass]={},font_name:string="font-medium",shadow:bool=true,spacing:f16=1.0,waviness:f16=0.0) {
 	_,commands,_,_:=map_entry(&state.text_draw_commands,font_name)
 	if cap(commands)==0 do commands^=make_soa_dynamic_array_len_cap(#soa[dynamic]Text_Draw_Command,length=0,capacity=TEXT_COMMANDS_CAP)
 	text:=fmt.aprint(..args,sep=sep)
@@ -345,13 +356,13 @@ render_text::proc(args:..any,sep:string="",pos:[2]f16={0,0},color:[4]f16=WHITE,s
 	font:=&state.fonts[font_name]; if font==nil do return
 	width:f16=f16(len(text))*f16(font.symbol_size.x)*spacing
 	height:f16=f16(font.symbol_size.y)
-	pos=pos-0.5*{width,height}+0.5*cast_array(font.symbol_size,f16)
+	pos=pos-0.5*{width,height}+0.5*la.array_cast(font.symbol_size,f16)
 	if .EAST in pivot { pos.x-=0.5*width }
 	if .WEST in pivot { pos.x+=0.5*width }
 	if .NORTH in pivot { pos.y-=0.5*height }
 	if .SOUTH in pivot { pos.y+=0.5*height }
 	use_shader(state.font_shader)
-	set_shader_param(state.font_shader.this_buffer_res,cast_array(state.resolution,f32))
+	set_shader_param(state.font_shader.this_buffer_res,la.array_cast(state.resolution,f32))
 	set_shader_param(state.font_shader.symbol_size,[2]f32{f32(font.symbol_size.x),f32(font.symbol_size.y)})
 	sym_pos:[2]f16=pos
 	for c,i in text {
@@ -360,7 +371,7 @@ render_text::proc(args:..any,sep:string="",pos:[2]f16={0,0},color:[4]f16=WHITE,s
 		wavy_offset:f16=waviness*f16(math.sin(3.12*state.net_time+f32(i))+math.cos(7.31*state.net_time+f32(i)))
 		command.positions=[3]f32{f32(sym_pos.x),f32(sym_pos.y+wavy_offset),0}
 		command.scale_factors=f32(scale_multiplier)
-		command.colors=cast_array(color,f32)
+		command.colors=la.array_cast(color,f32)
 		sym_pos.x+=spacing*f16(font.symbol_size.x)
 		for _ in 0..<QUAD_VERTS do append_soa_elem(commands,command) }}
 glfw_error_callback::proc"c"(error:i32,description:cstring) {
