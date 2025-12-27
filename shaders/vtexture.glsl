@@ -5,6 +5,7 @@ layout(location=3) in vec2 params_1;
 layout(location=4) in vec3 rotation_matrix_0;
 layout(location=5) in vec3 rotation_matrix_1;
 layout(location=6) in vec3 rotation_matrix_2;
+layout(location=7) in int space;
 uniform vec2 resolution;
 uniform mat3 view_matrix;
 uniform float time;
@@ -13,9 +14,13 @@ flat out int waves;
 flat out int windy;
 flat out int caustics;
 flat out float lightness;
+flat out int space_out;
 vec2 project(vec2 point) {
 	return 2*point/resolution; }
+#define SPACE_WORLD  0
+#define SPACE_SCREEN 1
 void main(void) {
+	space_out = space;
 	mat3 rotation_matrix=mat3(rotation_matrix_0,rotation_matrix_1,rotation_matrix_2);
 	waves=int(params_0.y);
 	windy=int(params_0.z);
@@ -26,10 +31,12 @@ void main(void) {
 	vec2 wn=vec2(pos.x-0.5*size.x,pos.y-0.5*size.y);
 	vec2 ws=vec2(pos.x-0.5*size.x,pos.y+0.5*size.y);
 	mat3 matrix=view_matrix*rotation_matrix;
+	if(space==SPACE_WORLD) {
 	en=(matrix*vec3(en,1)).xy;
 	es=(matrix*vec3(es,1)).xy;
 	wn=(matrix*vec3(wn,1)).xy;
 	ws=(matrix*vec3(ws,1)).xy;
+	}
 	vec2 point=vec2(0);
 	if((gl_VertexID%6)==0) {      point=ws; tex_coord=vec2(0,0); }
 	else if((gl_VertexID%6)==1) { point=es; tex_coord=vec2(1,0); }

@@ -7,6 +7,7 @@ import "core:math/linalg"
 import "core:slice"
 import "core:math/rand"
 import "core:time"
+import gl "vendor:OpenGL"
 seed_board::proc(board:^Board) {
 	for i in 0..<board.size.x { for j in 0..<board.size.y {
 		board.seeds[i][j]=u32(rand.int31()) }}
@@ -20,7 +21,7 @@ clear_board::proc(board:^Board) {
 		board.vision[i][j]=false
 		board.cells[i][j]=nil
 		fill_2d_slice(board.projected_cell_rects, Rect(f16){})
-		fill_2d_slice(board.flags,false) }
+		fill_2d_slice(board.flags,nil) }
 	clear_dynamic_array(&board.fishes) }
 random_direction::proc(pool:[]Compass)->Compass {
 	i:=rand.int31_max(i32(len(pool)))
@@ -56,7 +57,7 @@ init_board::proc(difficulty:Difficulty) {
 	state.board.cells=make_2d_slice(Maybe(Entity),cast(int)state.board.size.x,cast(int)state.board.size.y)
 	state.board.projected_cell_rects=make_2d_slice(Rect(f16),cast(int)state.board.size.x,cast(int)state.board.size.y)
 	state.board.seeds=make_2d_slice(u32,cast(int)state.board.size.x,cast(int)state.board.size.y)
-	state.board.flags=make_2d_slice(bool,cast(int)state.board.size.x,cast(int)state.board.size.y)
+	state.board.flags=make_2d_slice(Maybe(Entity),cast(int)state.board.size.x,cast(int)state.board.size.y)
 	state.board.threats=make_2d_slice(i8,cast(int)state.board.size.x,cast(int)state.board.size.y)
 	state.board.estimated_threats=make_2d_slice(i8,cast(int)state.board.size.x,cast(int)state.board.size.y)
 	clear_board(&state.board)
@@ -78,7 +79,6 @@ init_board::proc(difficulty:Difficulty) {
 	board_tick()
 	zero_and_start_timer(&state.play_timer) }
 menu_board::proc(board:^Board) {
-	set_depth_test(true)
 	i,j:i8; board_iterator(&i,&j)
 	for iterate_board(board,&i,&j) do if cells_distance(BOARD_SIZE_MENU.x/2,BOARD_SIZE_MENU.y/2,i,j)>(8+i8(rand.int31_max(16))) do board.vision[i][j]=true }
 random_normalized_vector::proc()->[2]f16 {
@@ -142,31 +142,31 @@ populate_board::proc(board:^Board,difficulty:Difficulty) {
 entity_pos::proc(i,j:f16)->[2]f16 {
 	return [2]f16{(f16(i)-f16(state.board.size.x-1)/2)*TILE_SIZE,(f16(j)-f16(state.board.size.y-1)/2)*TILE_SIZE} }
 render_entity::proc(entity:Entity,i,j:i8) {
-	render_cell(name=entity_names[entity.kind],i=f16(i),j=f16(j),layer=Layer.CROCODILES,flags={.WAVY}) }
+	render_cell(name=entity_names[entity.kind],i=f16(i),j=f16(j),layer=LAYER_ABOVE_SURFACE,flags={/*.WAVY*/}) }
 render_whiteline::proc(i,j0,j1:f16) {
-	render_cell(name="whiteline-end",i=f16(i),j=f16(j1+1),layer=Layer.GUI_LINES)
-	for j in j0..=j1 do render_cell(name="whiteline-1",i=f16(i),j=f16(j),layer=Layer.GUI_LINES)
-	render_cell(name="whiteline-end",i=f16(i),j=f16(j0-1),direction=.SOUTH,layer=Layer.GUI_LINES) }
+	render_cell(name="whiteline-end",i=f16(i),j=f16(j1+1),layer=LAYER_ABOVE_SURFACE)
+	for j in j0..=j1 do render_cell(name="whiteline-1",i=f16(i),j=f16(j),layer=LAYER_ABOVE_SURFACE)
+	render_cell(name="whiteline-end",i=f16(i),j=f16(j0-1),direction=.SOUTH,layer=LAYER_ABOVE_SURFACE) }
 all_entities_are_flagged::proc(board:^Board)->bool {
 	for entity,_ in board.entities do if !entity_is_flagged(board,entity.x,entity.y) do return false
 	return true }
-render_cell::proc(name:string,i,j:f16,extra_rotation:f16=0,direction:Compass=.NORTH,layer:f16=Layer.BOTTOM,flags:Cell_Flags_Register={}) {
+render_cell::proc(name:string,i,j:f16,extra_rotation:f16=0,direction:Compass=.NORTH,layer:f16=LAYER_ABOVE_SURFACE,flags:Cell_Flags_Register={}) {
 	pos:[2]f16=entity_pos(i,j)
 	// @(static) DIRECTION_ROTATION:[4]f16={-0.5*math.PI,0.5*math.PI,0,math.PI}
 	rotation:f16=DIRECTION_ROTATION[int(direction)]+extra_rotation
 	hovered:=(!mouse_pressed(.MOUSE_LEFT))&&inside_board(&state.board,f16(i),f16(j))?in_rect(cast_array(state.cursor,f16),state.board.projected_cell_rects[int(i)][int(j)]):false
-	render_texture(name=name,pos=pos,size={TILE_SIZE,TILE_SIZE},rotation=rotation,depth=layer,lightness=hovered?(0.6+0.05*f16(math.sin(8*state.net_time))):(state.board.last_click==[2]i8{auto_cast i,auto_cast j})?0.7:0.5,flags=flags)
+	render_texture(name=name,rect={pos,{TILE_SIZE,TILE_SIZE}},rotation=rotation,depth=layer,lightness=hovered?(0.6+0.05*f16(math.sin(8*state.net_time))):(state.board.last_click==[2]i8{auto_cast i,auto_cast j})?0.5:0.5,flags=flags)
 	if hovered do state.hovered_name=name }
 render_fish::proc(fish:Fish) {
-	render_cell(name=fish.seed<0.1?FISHES_NAME:FISH_NAME,i=auto_cast fish.position.x,j=auto_cast fish.position.y,extra_rotation=0.1*f16(math.sin(4*state.net_time)),layer=Layer.FISHES,flags={.WAVY,.CAUSTICS}) }
+	render_cell(name=fish.seed<0.1?FISHES_NAME:FISH_NAME,i=auto_cast fish.position.x,j=auto_cast fish.position.y,extra_rotation=0.1*f16(math.sin(4*state.net_time)),layer=LAYER_BELOW_SURFACE,flags={.WAVY,.CAUSTICS}) }
 // clear_cell::proc(board:^Board,i,j:int) {
 // 	deep_entity,found_deep:=board.cells[i][j].?
 // 	if found_deep&&(deep_entity.kind==.CROC_HEAD) do despawn_entity(board,i,j)
 // 	else if found_deep&&(deep_entity.kind==.CROC_TAIL) do despawn_entity(board,i,j) }
-entity_is_flagged::proc(board:^Board,i,j:i8)->bool {
-	entity,ok:=board.cells[i][j].?
-	if !ok do return false
-	return board.flags[i][j] }
+entity_is_flagged::proc(board:^Board,i,j:i8)->(ok:bool) {
+	if board.flags[i][j]==nil do return false
+	entity:=board.cells[i][j].? or_return
+	return board.flags[i][j].?.kind==entity.kind }
 cell_occupied::proc(board:^Board,i,j:i8)->bool {
 	return board.cells[i][j]!=nil }
 fish_tick::proc(fish:^Fish) {
@@ -183,18 +183,19 @@ FLOWER_NAMES:=[?]string{"lotus","iris","marigold","lily"}
 render_border::proc(directions:bit_set[Compass],i,j:i8) {
 	seed:=state.board.seeds[i][j]
 	pos:[2]f16={(f16(i)-f16(state.board.size.x-1)/2)*TILE_SIZE,(f16(j)-f16(state.board.size.y-1)/2)*TILE_SIZE}
-	if .EAST in directions { render_texture(name=LINE_NAMES[(seed+0)%4],pos=(pos+{TILE_SIZE/2,0}),size={TILE_SIZE,TILE_SIZE}) }
-	if .WEST in directions { render_texture(name=LINE_NAMES[(seed+1)%4],pos=(pos+{-TILE_SIZE/2,0}),size={TILE_SIZE,TILE_SIZE}) }
-	if .NORTH in directions { render_texture(name=LINE_NAMES[(seed+2)%4],pos=(pos+{0,TILE_SIZE/2}),size={TILE_SIZE,TILE_SIZE},rotation=math.PI/2) }
-	if .SOUTH in directions { render_texture(name=LINE_NAMES[(seed+3)%4],pos=(pos+{0,-TILE_SIZE/2}),size={TILE_SIZE,TILE_SIZE},rotation=math.PI/2) }}
+	if .EAST in directions { render_texture(name=LINE_NAMES[(seed+0)%4],rect={(pos+{TILE_SIZE/2,0}),{TILE_SIZE,TILE_SIZE}}) }
+	if .WEST in directions { render_texture(name=LINE_NAMES[(seed+1)%4],rect={(pos+{-TILE_SIZE/2,0}),{TILE_SIZE,TILE_SIZE}}) }
+	if .NORTH in directions { render_texture(name=LINE_NAMES[(seed+2)%4],rect={(pos+{0,TILE_SIZE/2}),{TILE_SIZE,TILE_SIZE}},rotation=math.PI/2) }
+	if .SOUTH in directions { render_texture(name=LINE_NAMES[(seed+3)%4],rect={(pos+{0,-TILE_SIZE/2}),{TILE_SIZE,TILE_SIZE}},rotation=math.PI/2) }}
 SURFACE_NAMES:=[?]string{"surface-1","surface-2","surface-3","surface-4"}
 render_surface::proc(i,j:i8,seed:u32) {
-	render_cell(name=SURFACE_NAMES[seed%4],i=f16(i),j=f16(j),layer=Layer.SURFACE,flags={.WAVY})
-	if seed<50_000_000 {
-		render_cell(name=FLOWER_NAMES[seed%4],i=f16(i),j=f16(j),layer=Layer.FLOWERS,flags={.WINDY}) }}
+	render_cell(name=SURFACE_NAMES[seed%4],i=f16(i),j=f16(j),layer=LAYER_SURFACE,flags={.WAVY})
+	// if seed<50_000_000 {
+	// 	render_cell(name=FLOWER_NAMES[seed%4],i=f16(i),j=f16(j),layer=LAYER_ABOVE_SURFACE,flags={.WINDY}) }
+	}
 BOTTOM_NAMES:=[?]string{"bottom-1","bottom-2","bottom-3","bottom-4"}
 render_bottom::proc(i,j:i8,seed:u32) {
-	render_cell(name=BOTTOM_NAMES[seed%4],i=f16(i),j=f16(j),layer=Layer.BOTTOM,flags={.WAVY,.CAUSTICS}) }
+	render_cell(name=BOTTOM_NAMES[seed%4],i=f16(i),j=f16(j),layer=LAYER_BELOW_SURFACE,flags={.WAVY,.CAUSTICS}) }
 board_iterator::proc(i,j:^i8) {
 	i^,j^=0,-1 }
 iterate_board::proc(board:^Board,i,j:^i8)->bool {
@@ -297,14 +298,13 @@ render_menu::proc() {
 	defer {
 		if state.hovered_name_stable!=state.hovered_name do state.hover_time=state.net_time
 		state.hovered_name_stable=state.hovered_name }
-	state.hovered_pos={0,0}
+	state.hovered_pos=nil
 	board:^Board=&state.board
 	i,j:i8; board_iterator(&i,&j)
-	set_depth_test(true)
 	for iterate_board(board,&i,&j) {
 		board.projected_cell_rects[i][j]=project_rect(Rect(f16){entity_pos(f16(i),f16(j)),TILE_SIZE},state.view_matrix)
 		hovered:=in_rect(cast_array(state.cursor,f16),state.board.projected_cell_rects[int(i)][int(j)])
-		if hovered do state.hovered_pos={i,j} }
+		if hovered do state.hovered_pos=[2]i8{i,j} }
 	board_iterator(&i,&j)
 	for iterate_board(board,&i,&j) {
 		if !board.vision[i][j] do render_surface(i,j,board.seeds[i][j])
@@ -315,7 +315,6 @@ render_menu::proc() {
 		if !board.vision[i][j] do continue
 		entity,found:=board.cells[i][j].?
 		if found do render_entity(entity,i,j) }
-	set_depth_test(false)
 	submenu:=&state.control_state.submenu
 	menu_j:f16=MENU_J
 	start_i:f16=f16(MENU_START_I)
@@ -323,17 +322,16 @@ render_menu::proc() {
 	audio_i:f16=f16(MENU_AUDIO_I)
 	exit_i:f16=f16(MENU_EXIT_I)
 	drag:=state.control_state.drag
-	if (submenu^==.START)||(submenu^==.NONE) do render_cell(name=START_NAME,i=f16(start_i),j=f16(menu_j+drag),layer=Layer.GUI_ICONS,flags={.WINDY})
-	if (submenu^==.DISPLAY)||(submenu^==.NONE) do render_cell(name=DISPLAY_NAME,i=f16(display_i),j=f16(menu_j+drag),layer=Layer.GUI_ICONS,flags={.WINDY})
-	if (submenu^==.AUDIO)||(submenu^==.NONE) do render_cell(name=AUDIO_NAME,i=f16(audio_i),j=f16(menu_j+drag),layer=Layer.GUI_ICONS,flags={.WINDY})
-	if (submenu^==.EXIT)||(submenu^==.NONE) do render_cell(name=EXIT_NAME,i=f16(exit_i),j=f16(menu_j+drag),layer=Layer.GUI_ICONS,flags={.WINDY})
+	if (submenu^==.START)||(submenu^==.NONE) do render_cell(name=START_NAME,i=f16(start_i),j=f16(menu_j+drag),layer=LAYER_ABOVE_SURFACE,flags={.WINDY})
+	if (submenu^==.DISPLAY)||(submenu^==.NONE) do render_cell(name=DISPLAY_NAME,i=f16(display_i),j=f16(menu_j+drag),layer=LAYER_ABOVE_SURFACE,flags={.WINDY})
+	if (submenu^==.AUDIO)||(submenu^==.NONE) do render_cell(name=AUDIO_NAME,i=f16(audio_i),j=f16(menu_j+drag),layer=LAYER_ABOVE_SURFACE,flags={.WINDY})
+	if (submenu^==.EXIT)||(submenu^==.NONE) do render_cell(name=EXIT_NAME,i=f16(exit_i),j=f16(menu_j+drag),layer=LAYER_ABOVE_SURFACE,flags={.WINDY})
 	set_blend(true)
-	set_depth_test(false)
-	render_texture(name="title-0",pos={0,280+8*f16(math.sin(state.net_time*4))+40*f16(math.pow(math.sin(state.net_time),16.0))},size=5*{256,82},depth=Layer.GUI_ICONS)
-	render_texture(name="title-1",pos={0,200+8*f16(math.sin(state.net_time*4))+20*f16(math.pow(math.sin(state.net_time),16.0))},size=5*{256,82},depth=Layer.GUI_ICONS)
+	render_texture(name="title-0",rect={{0,280+8*f16(math.sin(state.net_time*4))+40*f16(math.pow(math.sin(state.net_time),16.0))},5*{256,82}},depth=LAYER_ABOVE_SURFACE)
+	render_texture(name="title-1",rect={{0,200+8*f16(math.sin(state.net_time*4))+20*f16(math.pow(math.sin(state.net_time),16.0))},5*{256,82}},depth=LAYER_ABOVE_SURFACE)
 	render_text("BOGWALKER",pos={0,0},color=WHITE,font_name="font-title",waviness=2.0,spacing=state.view_scale*1.2,scale_multiplier=state.view_scale*1.5+0.02*(f16(math.sin(3.12*state.net_time))+f16(math.cos(7.31*state.net_time))))
 	t:f16=min(8*f16(state.net_time-state.hover_time),1)
-	if slice.contains([]string{START_NAME,DISPLAY_NAME,AUDIO_NAME,EXIT_NAME},state.hovered_name)&&(submenu^==.NONE) do render_text(state.hovered_name,pos=project_pos(entity_pos(f16(state.hovered_pos.x),f16(state.hovered_pos.y)+0.70)),pivot={.SOUTH},font_name="font-medium",scale_multiplier=1.5+0.5*t,spacing=1+0.5*t)
+	if slice.contains([]string{START_NAME,DISPLAY_NAME,AUDIO_NAME,EXIT_NAME},state.hovered_name)&&(submenu^==.NONE) do render_text(state.hovered_name,pos=project_pos(entity_pos(f16(state.hovered_pos.?.x),f16(state.hovered_pos.?.y)+0.70)),pivot={.SOUTH},font_name="font-medium",scale_multiplier=1.5+0.5*t,spacing=1+0.5*t)
 	#partial switch submenu^ {
 	case .START:
 		select:=math.round(drag)
@@ -402,14 +400,13 @@ render_borders::proc(board:^Board) {
 render_board::proc() {
 	state.hovered_name=""
 	defer state.hovered_name_stable=state.hovered_name
-	state.hovered_pos={0,0}
+	state.hovered_pos=nil
 	board:^Board=&state.board
 	i,j:i8; board_iterator(&i,&j)
-	set_depth_test(true)
 	for iterate_board(board,&i,&j) {
 		board.projected_cell_rects[i][j]=project_rect(Rect(f16){entity_pos(f16(i),f16(j)),TILE_SIZE},state.view_matrix)
 		hovered:=in_rect(cast_array(state.cursor,f16),state.board.projected_cell_rects[int(i)][int(j)])
-		if hovered do state.hovered_pos={i,j} }
+		if hovered do state.hovered_pos=[2]i8{i,j} }
 	board_iterator(&i,&j)
 	for iterate_board(board,&i,&j) {
 		if (!board.vision[i][j])&&(!((.DEAD in state.flags)||(.VICTORIOUS in state.flags))) {
@@ -421,14 +418,19 @@ render_board::proc() {
 	render_borders(board)
 	board_iterator(&i,&j)
 	for iterate_board(board,&i,&j) {
-		if board.flags[i][j] do render_cell(name="buoy",i=auto_cast i,j=auto_cast j,extra_rotation=0.1*f16(math.sin(2*state.net_time)),flags={.WINDY},layer=Layer.GUI_TEXT)
+		// DICK
+		// layer=Layer.GUI_TEXT
+		if board.flags[i][j]!=nil {
+			render_entity(board.flags[i][j].?,i,j)
+			fmt.println("Rendering flag") }
 		if (!board.vision[i][j])&&(!((.DEAD in state.flags)||(.VICTORIOUS in state.flags))) { continue }
 		use_shader(state.texture_shader)
 		deep_entity,found_deep:=board.cells[i][j].?
 		if found_deep do render_entity(deep_entity,i,j) }
+	if board.last_click!=nil {
+		hero_pos:=board.last_click.([2]i8)
+		render_entity({ kind=.HERO },hero_pos.x,hero_pos.y) }
 	set_blend(true)
-	set_depth_test(true)
-	set_depth_test(false)
 	board_iterator(&i,&j)
 	for iterate_board(board,&i,&j) {
 		threat:=board.threats[i][j]
@@ -448,9 +450,6 @@ render_board::proc() {
 	render_text("hide entities   E",pos=text_pos,pivot={.EAST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
 	render_text("reveal board   W",pos=text_pos,pivot={.EAST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
 	render_text("hide board   Q",pos=text_pos,pivot={.EAST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
-
-
-
 	text_pos={-0.5*f16(state.window_size.x)+8,0.5*f16(state.window_size.y)-8}
 	render_text("remaining monsters: ",fmt.aprint(len(board.entities)-int(board.n_flags)),pos=text_pos,pivot={.WEST,.NORTH},font_name="font-medium",scale_multiplier=1.5)
 	text_pos={0.5*f16(state.window_size.x)-8,0.5*f16(state.window_size.y)-8}
@@ -462,7 +461,20 @@ render_board::proc() {
 		if .HIGHSCORE_SET in state.flags do render_text("new highscore!",pos=text_pos+{0,-f16(state.resolution.y)+96},font_name="font-title",waviness=2.0,spacing=0.6) }
 	if .DEAD in state.flags do render_text("LOSER",pos=text_pos,color=WHITE,font_name="font-title",waviness=2.0,spacing=0.8)
 	pos:=[2]f16{0,-0.5*f16(state.window_size.y)+8+TILE_SIZE/2}
-	render_texture(name="krokul",pos=pos,size={TILE_SIZE,TILE_SIZE})
+	pos.x-=0.5*len(Entity_Kind)*1.2*TILE_SIZE
+	for i in 1..<len(Entity_Kind) {
+		entity_kind:=cast(Entity_Kind)i
+		rect:Rect(f16)={pos,{TILE_SIZE,TILE_SIZE}}
+		hovered:=rect_hovered(rect)
+		render_texture(name=entity_names[entity_kind],rect={rect.pos,(hovered?1.2:1.0)*rect.size},space=.SCREEN,depth=0.0)
+		// polygon_mode(gl.LINE)
+		// DICK
+		if state.marker_kind==entity_kind do render_rect({rect.pos,1.4*rect.size},{1,0,0,1},0.0,1.0)
+		if mouse_was_pressed(.MOUSE_LEFT)&&hovered do state.marker_kind=entity_kind
+		// polygon_mode(gl.FILL)
+		pos.x+=1.2*TILE_SIZE
+		// render_text("ESC give up",pos=text_pos,pivot={.WEST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
+	}
 }
 board_tick::proc() {
 	board:^Board=&state.board
@@ -544,14 +556,15 @@ game_tick::proc() {
 		if key_was_pressed(.R) do init_board(state.board.difficulty)
 		switch (.DEAD in state.flags)||(.VICTORIOUS in state.flags) {
 			case false:
-			if mouse_pressed(.MOUSE_LEFT) {
-				click_pos:=state.hovered_pos
+			if (state.hovered_pos!=nil)&&mouse_pressed(.MOUSE_LEFT) {
+				click_pos:[2]i8=state.hovered_pos.?
 				if board.untouched {
 					if cell_occupied(board,click_pos.x,click_pos.y) do despawn_entity(board,click_pos.x,click_pos.y)
 					when AREAL_FIRST_CLEAR do for entity in board.entities do if cells_distance(entity.x,entity.y,click_pos.x,click_pos.y)<=CROC_WIGGLINESS do despawn_entity(board,entity.x,entity.y)
 					clear_threats(&state.board)
 					calculate_threats(&state.board) }
-				if !board.flags[click_pos.x][click_pos.y] do if reveal_cell(board,click_pos.x,click_pos.y) {
+				if board.flags[click_pos.x][click_pos.y]==nil do if reveal_cell(board,click_pos.x,click_pos.y) {
+					// DICK
 					switch rand.int31_max(10) {
 						case 0: play_sound("clear0")
 						case 1: play_sound("clear1")
@@ -566,14 +579,19 @@ game_tick::proc() {
 					board.last_click=click_pos
 					board.untouched=false
 					 } board_tick() }
-			if key_was_pressed(.F) {
-				result:=!board.flags[state.hovered_pos.x][state.hovered_pos.y]
-				if result&&(int(board.n_flags)<len(board.entities)) {
-					board.flags[state.hovered_pos.x][state.hovered_pos.y]=result
-					board.n_flags+=1 }
-				if !result {
-					board.flags[state.hovered_pos.x][state.hovered_pos.y]=result
-					board.n_flags-=1 }
+			if (state.hovered_pos!=nil)&&key_was_pressed(.F) {
+				hovered_pos:=state.hovered_pos.?
+				flag:=&board.flags[hovered_pos.x][hovered_pos.y]
+				if flag^==nil do flag^=Entity{kind=state.marker_kind}
+				fmt.println("Putting down flag...")
+				// (TODO): What does this do?
+				// result:=board.flags[state.hovered_pos.x][state.hovered_pos.y]
+				// if result&&(int(board.n_flags)<len(board.entities)) {
+				// 	board.flags[state.hovered_pos.?.x][state.hovered_pos.?.y]=result
+				// 	board.n_flags+=1 }
+				// if !result {
+				// 	board.flags[state.hovered_pos.?.x][state.hovered_pos.?.y]=result
+				// 	board.n_flags-=1 }
 				board_tick() }
 			if key_pressed(.Q) {
 				board_set_vision(&state.board,false) }
@@ -594,7 +612,7 @@ inside_board_f16::proc(board:^Board,i,j:f16)->bool {
 	return in_range(i,0,f16(board.size.x-1))&&in_range(j,0,f16(board.size.y-1)) }
 reveal_cell::proc(board:^Board,i,j:i8)->(revealed:bool) {
 	if !inside_board(board,i,j) do return false
-	if board.flags[i][j] do return false
+	if board.flags[i][j]!= nil do return false
 	if board.vision[i][j] do return false
 	board.vision[i][j]=true
 	if distance_to_entity(board,i,j)<=KILL_DISTANCE {

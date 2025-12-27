@@ -15,4 +15,6 @@ void main(void) {
 	if(grayscale==1) {
 		color.xyz=vec3(lm); }
 	float t=4*(-pow(lm-0.5,2.0)+0.25);
-	color.xyz=mix(color.xyz,color.xyz*vec3(0.8,1,0),0.75*t); }
+	// vec3 hue=vec3(0.8,1,0.2);
+	vec3 hue=vec3(1.0);
+	color.xyz=mix(color.xyz,color.xyz*hue,0.75*t); }

@@ -4,6 +4,7 @@ uniform float time;
 flat in int waves;
 flat in int windy;
 flat in int caustics;
+flat in int space_out;
 uniform mat3 view_matrix;
 uniform float view_zoom;
 in vec2 tex_coord;
@@ -33,6 +34,8 @@ vec2 wave(vec2 direction,float a,float f,float s) {
 	return a*sin(f*time+normalize(direction)*tex_coord/s); }
 float lum(vec3 c) {
 	return length(c)/length(vec3(1)); }
+#define SPACE_WORLD  0
+#define SPACE_SCREEN 1
 void main(void) {
 	vec2 uv=(inverse(view_matrix)*vec3((gl_FragCoord.xy-resolution/2),1)).xy;
 	vec2 ws=waves_slope(uv);
@@ -51,4 +54,4 @@ void main(void) {
 	color.xyz=mix(vec3(0-(1-lm)),mix(color.xyz,vec3(1+lm),t1),t2);
 	if(caustics==1) { if((ws.x>c1)&&(ws.x<c2)) { color.xyz*=vec3(1)+2*vec3(1,0.9,0.8)*pow(1-abs(2*flat_step(c1,c2,ws.x)-1),4.0); }}
 	gl_FragDepth=gl_FragCoord.z;
-	if(color.w==0) { gl_FragDepth=1; }}
+	if(color.w==0) { gl_FragDepth=1; } }

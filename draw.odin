@@ -53,13 +53,15 @@ init_gl::proc() {
 	bind_vertex_buffer(0)
 	gl.BindFramebuffer(gl.FRAMEBUFFER,0)
 	gl.ClearColor(0,0,0,1)
-	gl.PolygonMode(gl.FRONT_AND_BACK,gl.FILL)
+	polygon_mode(gl.FILL)
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)
 	gl.FrontFace(gl.CW)
 	gl.Disable(gl.CULL_FACE)
 	gl.CullFace(gl.FRONT)
 	gl.BlendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA) }
+polygon_mode::proc(mode:u32) {
+	gl.PolygonMode(gl.FRONT_AND_BACK,mode) }
 select_render_buffer::proc(render_buffer:^Render_Buffer) {
 	gl.BindFramebuffer(gl.FRAMEBUFFER,u32(render_buffer.frame_buffer_handle))
 	gl.Viewport(0,0,i32(state.resolution.x),i32(state.resolution.y)) }
@@ -185,8 +187,15 @@ set_shader_param::proc{set_shader_param_1f32,set_shader_param_2f32,set_shader_pa
 bind_texture::proc(binding_point:u32,handle:u32) {
 	gl.ActiveTexture(binding_point)
 	gl.BindTexture(gl.TEXTURE_2D,u32(handle)) }
-draw_triangles::proc(count:i32) {
+draw_triangles::proc(count:i32,depth_test:bool) {
+	set_depth_test(depth_test)
 	gl.DrawArrays(gl.TRIANGLES,0,count) }
+draw_points::proc(count:i32,depth_test:bool) {
+	set_depth_test(depth_test)
+	gl.DrawArrays(gl.POINTS,0,count) }
+draw_lines::proc(count:i32,depth_test:bool) {
+	set_depth_test(depth_test)
+	gl.DrawArrays(gl.LINES,0,count) }
 use_shader::proc(shader:^$T,loc:=#caller_location)->(^T) {
 	assert(shader!=nil,loc=loc); assert(shader.handle!=0,loc=loc)
 	gl.UseProgram(u32(shader.handle))
@@ -195,40 +204,6 @@ set_blend::proc(value:bool) {
 	if value { gl.Enable(gl.BLEND) } else { gl.Disable(gl.BLEND) } }
 set_depth_test::proc(value:bool) {
 	if value { gl.Enable(gl.DEPTH_TEST) } else { gl.Disable(gl.DEPTH_TEST) } }
-render_texture::proc(name:string,pos:[2]f16,size:[2]f16={-1,-1},rotation:f16=0.0,depth:f16=0.0,lightness:f16=0.5,flags:Cell_Flags_Register={}) {
-	use_shader(state.texture_shader)
-	rotation_matrix:matrix[3,3]f32=pan_matrix(cast_array(pos,f32))*rotate_matrix(f32(rotation))*pan_matrix(cast_array(-pos,f32))
-	_,commands,_,_:=map_entry(&state.texture_draw_commands,name)
-	if cap(commands)==0 do commands^=make_soa_dynamic_array_len_cap(#soa[dynamic]Texture_Draw_Command,length=0,capacity=TEXTURE_COMMANDS_CAP)
-	command:Texture_Draw_Command
-	command.pos=cast_array(pos,f32)
-	command.size=cast_array(size,f32)
-	command.params_0={f32(depth),f32(i32(.WAVY in flags)),f32(i32(.WINDY in flags)),f32(i32(.CAUSTICS in flags))}
-	command.params_1={f32(lightness),f32(rotation)}
-	copy_slice(command.rotmat_0[:],rotation_matrix[0][:])
-	copy_slice(command.rotmat_1[:],rotation_matrix[1][:])
-	copy_slice(command.rotmat_2[:],rotation_matrix[2][:])
-	for _ in 0..<QUAD_VERTS {
-		_,err:=append_soa_elem(commands,command)
-		assert(err==.None) }}
-render_texture_group::proc(name:string) {
-	use_shader(state.texture_shader)
-	commands,ok:=&state.texture_draw_commands[name]; if !ok do return
-	n:=len(commands); if n==0 do return
-	bind_vertex_array(0)
-	i:int=0
-	upload_vertex_buffer_data(Attribute_Index(i),VBO_Index(i),gl.FLOAT,&commands.pos[0],n); i+=1
-	upload_vertex_buffer_data(Attribute_Index(i),VBO_Index(i),gl.FLOAT,&commands.size[0],n); i+=1
-	upload_vertex_buffer_data(Attribute_Index(i),VBO_Index(i),gl.FLOAT,&commands.params_0[0],n); i+=1
-	upload_vertex_buffer_data(Attribute_Index(i),VBO_Index(i),gl.FLOAT,&commands.params_1[0],n); i+=1
-	upload_vertex_buffer_data(Attribute_Index(i),VBO_Index(i),gl.FLOAT,&commands.rotmat_0[0],n); i+=1
-	upload_vertex_buffer_data(Attribute_Index(i),VBO_Index(i),gl.FLOAT,&commands.rotmat_1[0],n); i+=1
-	upload_vertex_buffer_data(Attribute_Index(i),VBO_Index(i),gl.FLOAT,&commands.rotmat_2[0],n)
-	bind_texture(gl.TEXTURE0,state.textures[name].handle)
-	texture_wrapping(gl.CLAMP_TO_EDGE)
-	texture_filtering(gl.NEAREST)
-	draw_triangles(i32(6*n))
-	runtime.clear_soa_dynamic_array(commands) }
 render_text_group::proc(name:string) {
 	use_shader(state.font_shader)
 	commands,ok:=&state.text_draw_commands[name]; if !ok do return
@@ -244,24 +219,33 @@ render_text_group::proc(name:string) {
 	upload_vertex_buffer_data(Attribute_Index(i),VBO_Index(i),gl.FLOAT,&commands.colors[0],n)
 	bind_texture(gl.TEXTURE0,state.textures[font.name].handle)
 	texture_filtering(gl.NEAREST)
-	draw_triangles(i32(6*n)) }
+	draw_triangles(i32(6*n),depth_test=true) }
 render_bloom_threshold::proc(render_buffer:^Render_Buffer) {
 	use_shader(state.bloom_threshold_shader)
 	bind_texture(gl.TEXTURE0,render_buffer.texture_handles[0])
-	draw_triangles(6) }
+	draw_triangles(6,depth_test=false) }
 render_blur::proc(render_buffer:^Render_Buffer,step:i8) {
 	use_shader(state.blur_shader)
 	set_shader_param(state.blur_shader.resolution,cast_array(state.resolution,f32))
 	set_shader_param(state.blur_shader.step,i32(step))
 	bind_texture(gl.TEXTURE0,render_buffer.texture_handles[0])
-	draw_triangles(6) }
+	draw_triangles(6,depth_test=false) }
+render_rect::proc(rect:Rect(f16),color:[4]f32,rounding:f32,depth:f32) {
+	use_shader(state.rect_shader)
+	set_shader_param(state.rect_shader.resolution,cast_array(state.resolution,f32))
+	set_shader_param(state.rect_shader.pos,cast_array(rect.pos,f32))
+	set_shader_param(state.rect_shader.size,cast_array(rect.size,f32))
+	set_shader_param(state.rect_shader.fill_color,color)
+	set_shader_param(state.rect_shader.rounding,rounding)
+	set_shader_param(state.rect_shader.depth,depth)
+	draw_triangles(6,depth_test=true) }
 render_bloom::proc(base_render_buffer:^Render_Buffer,bloom_render_buffer:^Render_Buffer) {
 	use_shader(state.bloom_shader)
 	// TEMP
 	// set_shader_param(state.bloom_shader.grayscale,i32(.DEAD in state.flags))
 	bind_texture(gl.TEXTURE0,base_render_buffer.texture_handles[0])
 	bind_texture(gl.TEXTURE1,bloom_render_buffer.texture_handles[0])
-	draw_triangles(6) }
+	draw_triangles(6,depth_test=false) }
 init_shader_params::proc($Type:typeid,shader:^Type) {
 	field_names:=reflect.struct_field_names(Type)
 	field_offsets:=reflect.struct_field_offsets(Type)
@@ -386,6 +370,7 @@ init_draw::proc() {
 	init_glfw()
 	init_gl()
 	init_shaders()
+	init_fontstash()
 	use_shader(state.texture_shader)
 	state.default_sb=make_render_buffer_static(state.window_size,1,{gl.RGBA8},{gl.RGBA}); assert(state.default_sb!=nil)
 	state.bloom_sb=make_render_buffer_static(state.window_size,1,{gl.RGBA8},{gl.RGBA}); assert(state.bloom_sb!=nil) }
@@ -408,17 +393,14 @@ draw_tick::proc() {
 	switch state.control_state.screen {
 	case .GAME: render_board()
 	case .MENU: render_menu() }
-	set_depth_test(true)
-	for name,_ in state.texture_draw_commands do render_texture_group(name)
+	render_texture_groups()
 	select_render_buffer(state.bloom_sb)
-	set_depth_test(false)
 	render_bloom_threshold(state.default_sb)
 	render_blur(state.bloom_sb,1)
 	render_blur(state.bloom_sb,2)
 	render_blur(state.bloom_sb,4)
 	select_frame_buffer(0)
 	render_bloom(state.default_sb,state.bloom_sb)
-	set_depth_test(false)
 	for name,_ in state.text_draw_commands do render_text_group(name)
 	swap_buffers() }
 get_windowed_mode_resolution::proc()->[2]u16 {
@@ -462,8 +444,14 @@ bind_vertex_array::proc(index:int) {
 bind_vertex_buffer::proc(index:int) {
 	if index>=len(state.vertex_buffers) do add_vertex_buffer()
 	gl.BindBuffer(gl.ARRAY_BUFFER,state.vertex_buffers[index]) }
-upload_vertex_buffer_data::proc(attribute_index:Attribute_Index,vbo_index:VBO_Index,type:u32,data:^$T,n_commands:int) {
+upload_vertex_buffer_data::proc(attribute_index:Attribute_Index,vbo_index:VBO_Index,$type:u32,data:^$T,n_commands:int) {
+	// fmt.printfln("attribute index: %v", cast(int)attribute_index)
+	// fmt.printfln("element type: %v", type_info_of(T))
+	// fmt.printfln("element size: %v", size_of(T))
 	bind_vertex_buffer(int(vbo_index))
 	gl.BufferData(gl.ARRAY_BUFFER,n_commands*size_of(T),data,gl.DYNAMIC_DRAW)
-	gl.VertexAttribPointer(u32(attribute_index),i32(len(T) when intrinsics.type_is_array(T) else 1),type,false,0,0)
+	// fmt.println("array length:", i32(len(T) when intrinsics.type_is_array(T) else 1))
+	// fmt.println("element type:", type)
+	when type==gl.FLOAT do gl.VertexAttribPointer(u32(attribute_index),i32(len(T) when intrinsics.type_is_array(T) else 1),type,false,0,0)
+	else do gl.VertexAttribIPointer(u32(attribute_index),i32(len(T) when intrinsics.type_is_array(T) else 1),type,0,0)
 	gl.EnableVertexAttribArray(u32(attribute_index)) }

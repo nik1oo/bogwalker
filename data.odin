@@ -5,9 +5,11 @@ import "core:fmt"
 import "core:time"
 import "core:strings"
 import "core:mem"
+import "core:math/linalg"
 import "vendor:glfw"
 import "vendor:miniaudio"
 import gl "vendor:OpenGL"
+import fs "vendor:fontstash"
 BOUNDED_RUNTIME::#config(BOUNDED_RUNTIME,false)
 BLACK:[4]f16:{0,0,0,1}
 WHITE:[4]f16:{1,1,1,1}
@@ -33,7 +35,9 @@ TEXTURE_COMMANDS_CAP::4096
 TEXT_COMMANDS_CAP::8192
 state:^State=nil
 DEFAULT_WINDOW_SIZE:[2]u16:{1728,972}
-Layer:struct{BOTTOM,CROCODILES,FISHES,SURFACE,FLOWERS,GUI_LINES,GUI_ICONS,GUI_TEXT:f16}:{0.8,0.7,0.6,0.5,0.4,0.3,0.2,0.1}
+LAYER_BELOW_SURFACE::0.4
+LAYER_SURFACE::0.5
+LAYER_ABOVE_SURFACE::0.4
 MENU_J::4
 MENU_START_I::BOARD_SIZE_MENU.x/2-3
 MENU_DISPLAY_I::BOARD_SIZE_MENU.x/2-1
@@ -58,7 +62,9 @@ DEFAULT_DISPLAY_SETTING::0
 DEFAULT_AUDIO_SETTING::1.0
 Flags::bit_set[enum{INPUT_RECEIVED,AUDIO_MENU_DRAWN,HIGHSCORE_SET,DEAD,VICTORIOUS,RUNNING,FULLSCREEN,}]
 entity_names:map[Entity_Kind]string
+matrix3_identity:=linalg.MATRIX3F32_IDENTITY
 State::struct {
+	marker_kind:Entity_Kind,
 	flags:Flags,
 	texture_draw_commands:map[string]#soa[dynamic]Texture_Draw_Command,
 	text_draw_commands:map[string]#soa[dynamic]Text_Draw_Command,
@@ -69,7 +75,7 @@ State::struct {
 	control_state:Control_State,
 	hovered_name:string,
 	hovered_name_stable:string,
-	hovered_pos:[2]i8,
+	hovered_pos:Maybe([2]i8),
 	view_top_left:[2]f16,
 	view_bottom_right:[2]f16,
 	view_pan:[2]f16,
@@ -131,15 +137,16 @@ State::struct {
 	hover_time:f32,
 	default_sb:^Render_Buffer,
 	bloom_sb:^Render_Buffer }
-Texture_Draw_Command::struct #packed {
+Texture_Draw_Command::struct {
 	pos:[2]f32,
 	size:[2]f32,
 	params_0:[4]f32,
 	params_1:[2]f32,
 	rotmat_0:[3]f32,
 	rotmat_1:[3]f32,
-	rotmat_2:[3]f32 }
-Text_Draw_Command::struct #packed {
+	rotmat_2:[3]f32,
+	space:[1]i32 }
+Text_Draw_Command::struct {
 	symbols:f32,
 	positions:[3]f32,
 	scale_factors:f32,
@@ -209,12 +216,9 @@ Rect_Shader::struct {
 	pos:i32,
 	size:i32,
 	fill_color:i32,
-	this_buffer_res:i32,
-	main_buffer_res:i32,
-	blue_noise_res:i32,
-	threshold_res:i32,
-	time:i32,
-	rounding:i32 }
+	resolution:i32,
+	rounding:i32,
+	depth:i32 }
 Texture_Shader::struct {
 	using shader:Shader,
 	pos:i32,
@@ -244,9 +248,10 @@ Blur_Shader::struct {
 	step:i32 }
 Blend_Shader::struct {
 	using shader:Shader }
+Space::enum u8 { WORLD,SCREEN }
 Mouse_Button::enum u8 { MOUSE_LEFT,MOUSE_RIGHT }
 Key::enum u8 { Q,W,E,F,R,ESCAPE,SPACE,ONE,TWO,THREE }
-Entity_Kind::enum u8 { KROKUL,IGNESA,BACKA,BORDANA,BRAGUL,DRAKUL,DURRUL,GRENDUL,MOOSUL,NOKUR,RIHTUL,RUSALKA,TRUL,VONDUL }
+Entity_Kind::enum u8 { HERO,KROKUL,IGNESA,BACKA,BORDANA,BRAGUL,DRAKUL,DURRUL,GRENDUL,MOOSUL,NOKUR,RIHTUL,RUSALKA,TRUL,VONDUL }
 Cell_Flags::enum u8 { WAVY,CAUSTICS,WINDY }
 Cell_Flags_Register::bit_set[Cell_Flags]
 PI:f16:3.14159265358979323846264338327950288
@@ -266,20 +271,26 @@ Board::struct {
 	cells:[][]Maybe(Entity),
 	projected_cell_rects:[][]Rect(f16),
 	seeds:[][]u32,
-	flags:[][]bool,
+	flags:[][]Maybe(Entity),
 	threats:[][]i8,
 	estimated_threats:[][]i8,
 	entities:[dynamic][2]i8,
 	n_flags:u8,
 	fishes:[dynamic]Fish,
-	last_click:[2]i8,
+	last_click:Maybe([2]i8),
 	untouched:bool }
+Glyph_Info::struct {
+	quad:fs.Quad,
+	glyph:fs.Glyph }
 init_data::proc() {
 	state=new(State)
+	state.marker_kind=.KROKUL
 	state.flags+={.RUNNING}
 	state.textures=make(map[string]Texture,37)
 	state.fonts=make(map[string]Font,4)
 	state.sounds=make(map[string]Sound,13)
+	state.vertex_arrays=make([dynamic]u32)
+	state.vertex_buffers=make([dynamic]u32)
 	state.control_state.screen=.MENU }
 init_assets::proc() {
 	read_and_load_texture("./images/bottom-1.png")
@@ -325,9 +336,11 @@ init_assets::proc() {
 	read_and_load_texture("./images/rusalka.png")
 	read_and_load_texture("./images/durrul.png")
 	read_and_load_texture("./images/bragul.png")
+	read_and_load_texture("./images/drakul.png")
 	read_and_load_texture("./images/moosul.png")
 	read_and_load_texture("./images/rihtul.png")
 	read_and_load_texture("./images/trul.png")
+	read_and_load_texture("./images/hero.png")
 	load_font("./images/font.png")
 	load_font("./images/font-title.png")
 	load_font("./images/font-huge.png")
@@ -346,6 +359,7 @@ init_assets::proc() {
 	load_sound("./sounds/clear8.wav")
 	load_sound("./sounds/clear9.wav")
 	entity_names=make(map[Entity_Kind]string)
+	entity_names[.HERO]="hero"
 	entity_names[.KROKUL]="krokul"
 	entity_names[.IGNESA]="ignesa"
 	entity_names[.GRENDUL]="grendul"
@@ -356,6 +370,7 @@ init_assets::proc() {
 	entity_names[.RUSALKA]="rusalka"
 	entity_names[.DURRUL]="durrul"
 	entity_names[.BRAGUL]="bragul"
+	entity_names[.DRAKUL]="drakul"
 	entity_names[.MOOSUL]="moosul"
 	entity_names[.RIHTUL]="rihtul"
 	entity_names[.TRUL]="trul" }
