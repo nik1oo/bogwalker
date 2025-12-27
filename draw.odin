@@ -54,8 +54,8 @@ init_gl::proc() {
 	gl.BindFramebuffer(gl.FRAMEBUFFER,0)
 	gl.ClearColor(0,0,0,1)
 	polygon_mode(gl.FILL)
+	set_blend(true)
 	gl.Enable(gl.DEPTH_TEST)
-	gl.Enable(gl.POINT_SMOOTH)
 	gl.DepthFunc(gl.LESS)
 	gl.FrontFace(gl.CW)
 	gl.Disable(gl.CULL_FACE)
@@ -77,43 +77,29 @@ clear_frame_buffer::proc(frame_buffer_handle:u32) {
 	gl.BindFramebuffer(gl.FRAMEBUFFER,frame_buffer_handle)
 	gl.Clear(gl.COLOR_BUFFER_BIT)
 	gl.Clear(gl.DEPTH_BUFFER_BIT) }
-make_render_buffer_static::proc(size:[2]u16,n_buffers:int,internal_formats:[]i32,formats:[]u32,depth_component:bool=true)->(render_buffer:^Render_Buffer) {
-	render_buffer=new(Render_Buffer)
-	ok:=init_render_buffer_static(render_buffer,size,n_buffers,internal_formats,formats,depth_component)
-	return ok?render_buffer:nil }
-init_render_buffer_static::proc(render_buffer:^Render_Buffer,size:[2]u16,n_buffers:int,internal_formats:[]i32,formats:[]u32,depth_component:bool=true)->bool {
-	if (size.x==0)||(size.y==0)||(n_buffers==0)||(len(internal_formats)!=n_buffers)||(len(formats)!=n_buffers) { return false }
-	render_buffer.size=size
-	render_buffer.texture_formats=make([]u32,len(formats))
-	render_buffer.n_frames=1
-	copy(render_buffer.texture_formats,formats)
-	render_buffer.texture_internal_formats=make([]i32,len(internal_formats))
-	copy(render_buffer.texture_internal_formats,internal_formats)
+init_render_buffer::proc(render_buffer:^Render_Buffer,size:[2]u16,internal_format:i32,format:u32,depth_component:bool=true) {
+	render_buffer^={initialized=true,size=size,texture_format=format,texture_internal_format=internal_format}
 	gl.GenFramebuffers(1,(^u32)(&render_buffer.frame_buffer_handle))
 	gl.BindFramebuffer(gl.FRAMEBUFFER,u32(render_buffer.frame_buffer_handle))
-	render_buffer.texture_handles=make([]u32,n_buffers)
-	for i in 0..<n_buffers {
-		gl.GenTextures(i32(n_buffers),(^u32)(&render_buffer.texture_handles[i]))
-		gl.BindTexture(gl.TEXTURE_2D,u32(render_buffer.texture_handles[i]))
-		gl.TexParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE)
-		gl.TexParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE)
-		gl.TexImage2D(gl.TEXTURE_2D,0,internal_formats[i],i32(size.x),i32(size.y),0,formats[i],gl.UNSIGNED_BYTE,nil)
-		texture_filtering(gl.NEAREST)
-		gl.BindTexture(gl.TEXTURE_2D,0)
-		gl.FramebufferTexture2D(gl.FRAMEBUFFER,u32(gl.COLOR_ATTACHMENT0+i),gl.TEXTURE_2D,u32(render_buffer.texture_handles[i]),0) }
-	if gl.CheckFramebufferStatus(gl.FRAMEBUFFER)!=gl.FRAMEBUFFER_COMPLETE { return false }
+	gl.GenTextures(1,(^u32)(&render_buffer.texture_handle))
+	gl.BindTexture(gl.TEXTURE_2D,u32(render_buffer.texture_handle))
+	gl.TexParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE)
+	gl.TexParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE)
+	gl.TexImage2D(gl.TEXTURE_2D,0,internal_format,i32(size.x),i32(size.y),0,format,gl.UNSIGNED_BYTE,nil)
+	texture_filtering(gl.NEAREST)
+	gl.BindTexture(gl.TEXTURE_2D,0)
+	gl.FramebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,u32(render_buffer.texture_handle),0)
+	assert(gl.CheckFramebufferStatus(gl.FRAMEBUFFER)==gl.FRAMEBUFFER_COMPLETE)
 	gl.GenRenderbuffers(1,(^u32)(&render_buffer.render_buffer_handle))
 	if depth_component {
 		gl.BindRenderbuffer(gl.RENDERBUFFER,u32(render_buffer.render_buffer_handle))
 		gl.RenderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT32,i32(size.x),i32(size.y))
 		gl.FramebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,u32(render_buffer.render_buffer_handle)) }
-	if gl.CheckFramebufferStatus(gl.FRAMEBUFFER)!=gl.FRAMEBUFFER_COMPLETE { return false }
-	render_buffer.initialized=true
-	return true }
+	assert(gl.CheckFramebufferStatus(gl.FRAMEBUFFER)==gl.FRAMEBUFFER_COMPLETE) }
 delete_render_buffer::proc(render_buffer:^Render_Buffer) {
 	if render_buffer==nil { return }
 	gl.DeleteFramebuffers(1,(^u32)(&render_buffer.frame_buffer_handle))
-	for _ in 0..<len(render_buffer.texture_handles) do gl.DeleteTextures(1,(^u32)(&render_buffer.texture_handles))
+	gl.DeleteTextures(1,(^u32)(&render_buffer.texture_handle))
 	gl.DeleteRenderbuffers(1,(^u32)(&render_buffer.render_buffer_handle)) }
 get_shader_param_handle::proc(shader_handle:u32,param_name:string)->(handle:i32) {
 	cstr:cstring=strings.clone_to_cstring(param_name)
@@ -223,13 +209,19 @@ render_text_group::proc(name:string) {
 	draw_triangles(i32(6*n),depth_test=true) }
 render_bloom_threshold::proc(render_buffer:^Render_Buffer) {
 	use_shader(state.bloom_threshold_shader)
-	bind_texture(0,render_buffer.texture_handles[0])
+	bind_texture(0,render_buffer.texture_handle)
 	draw_triangles(6,depth_test=false) }
 render_blur::proc(render_buffer:^Render_Buffer,step:i8) {
 	use_shader(state.blur_shader)
 	set_shader_param(state.blur_shader.resolution,la.array_cast(state.resolution,f32))
 	set_shader_param(state.blur_shader.step,i32(step))
-	bind_texture(0,render_buffer.texture_handles[0])
+	bind_texture(0,render_buffer.texture_handle)
+	draw_triangles(6,depth_test=false) }
+render_outline::proc(render_buffer:^Render_Buffer,size:u8) {
+	use_shader(state.outline_shader)
+	set_shader_param(state.outline_shader.resolution,la.array_cast(state.resolution,f32))
+	set_shader_param(state.outline_shader.size,i32(size))
+	bind_texture(0,render_buffer.texture_handle)
 	draw_triangles(6,depth_test=false) }
 render_rect::proc(rect:Rect(f16),color:[4]f32,rounding:f32,depth:f32) {
 	use_shader(state.rect_shader)
@@ -252,8 +244,8 @@ render_bloom::proc(base_render_buffer:^Render_Buffer,bloom_render_buffer:^Render
 	use_shader(state.bloom_shader)
 	// TEMP
 	// set_shader_param(state.bloom_shader.grayscale,i32(.DEAD in state.flags))
-	bind_texture(0,base_render_buffer.texture_handles[0])
-	bind_texture(1,bloom_render_buffer.texture_handles[0])
+	bind_texture(0,base_render_buffer.texture_handle)
+	bind_texture(1,bloom_render_buffer.texture_handle)
 	draw_triangles(6,depth_test=false) }
 init_shader_params::proc($Type:typeid,shader:^Type) {
 	field_names:=reflect.struct_field_names(Type)
@@ -285,6 +277,7 @@ init_shaders::proc() {
 	state.bloom_threshold_shader=init_shader("bloom-threshold",Bloom_Threshold_Shader,"./shaders/vfill.glsl","./shaders/fbloom_threshold.glsl")
 	state.blur_shader=init_shader("blur",Blur_Shader,"./shaders/vfill.glsl","./shaders/fblur.glsl")
 	state.bloom_shader=init_shader("bloom",Bloom_Shader,"./shaders/vfill.glsl","./shaders/fbloom.glsl")
+	state.outline_shader=init_shader("outline",Outline_Shader,"./shaders/vfill.glsl","./shaders/foutline.glsl")
 	state.font_shader=init_shader("font",Font_Shader,"./shaders/vfont.glsl","./shaders/ffont.glsl")
 	state.rect_shader=init_shader("rect",Rect_Shader,"./shaders/vrect.glsl","./shaders/frect.glsl")
 	state.glyph_shader=init_shader("glyph",Glyph_Shader,"./shaders/vglyph.glsl","./shaders/fglyph.glsl")
@@ -337,10 +330,10 @@ resolution_callback::proc"c"(window:glfw.WindowHandle,width,height:i32) {
 	state.window_size=[2]u16{u16(width),u16(height)}
 	state.resolution=state.window_size
 	gl.Viewport(0,0,i32(state.window_size.x),i32(state.window_size.y))
-	delete_render_buffer(state.default_sb)
-	delete_render_buffer(state.bloom_sb)
-	state.default_sb=make_render_buffer_static(state.window_size,1,{gl.RGBA8},{gl.RGBA}); assert(state.default_sb!=nil)
-	state.bloom_sb=make_render_buffer_static(state.window_size,1,{gl.RGBA8},{gl.RGBA}); assert(state.bloom_sb!=nil)
+	delete_render_buffer(&state.default_sb)
+	delete_render_buffer(&state.bloom_sb)
+	init_render_buffer(&state.default_sb,state.window_size,gl.RGBA8,gl.RGBA)
+	init_render_buffer(&state.bloom_sb,state.window_size,gl.RGBA8,gl.RGBA)
 	state.settings.window_size=(state.settings.display==.WINDOWED)?state.window_size:DEFAULT_WINDOW_SIZE
 	use_shader(state.texture_shader)
 	set_shader_param(state.texture_shader.resolution,la.array_cast(state.resolution,f32))
@@ -348,32 +341,32 @@ resolution_callback::proc"c"(window:glfw.WindowHandle,width,height:i32) {
 error_callback::proc"c"(source:u32,type:u32,id:u32,severity:u32,length:i32,message:cstring,userParam:rawptr) {
 	context=runtime.default_context()
 	if severity>gl.DEBUG_SEVERITY_NOTIFICATION do fmt.println(source,type,id,severity,length,message) }
-_render_text::proc(args:..any,sep:string="",pos:[2]f16={0,0},color:[4]f16=WHITE,scale_multiplier:f16=1.0,pivot:bit_set[Compass]={},font_name:string="font-medium",shadow:bool=true,spacing:f16=1.0,waviness:f16=0.0) {
-	_,commands,_,_:=map_entry(&state.text_draw_commands,font_name)
-	if cap(commands)==0 do commands^=make_soa_dynamic_array_len_cap(#soa[dynamic]Text_Draw_Command,length=0,capacity=TEXT_COMMANDS_CAP)
-	text:=fmt.aprint(..args,sep=sep)
-	pos:=pos
-	font:=&state.fonts[font_name]; if font==nil do return
-	width:f16=f16(len(text))*f16(font.symbol_size.x)*spacing
-	height:f16=f16(font.symbol_size.y)
-	pos=pos-0.5*{width,height}+0.5*la.array_cast(font.symbol_size,f16)
-	if .EAST in pivot { pos.x-=0.5*width }
-	if .WEST in pivot { pos.x+=0.5*width }
-	if .NORTH in pivot { pos.y-=0.5*height }
-	if .SOUTH in pivot { pos.y+=0.5*height }
-	use_shader(state.font_shader)
-	set_shader_param(state.font_shader.this_buffer_res,la.array_cast(state.resolution,f32))
-	set_shader_param(state.font_shader.symbol_size,[2]f32{f32(font.symbol_size.x),f32(font.symbol_size.y)})
-	sym_pos:[2]f16=pos
-	for c,i in text {
-		command:Text_Draw_Command
-		command.symbols=f32(c)
-		wavy_offset:f16=waviness*f16(math.sin(3.12*state.net_time+f32(i))+math.cos(7.31*state.net_time+f32(i)))
-		command.positions=[3]f32{f32(sym_pos.x),f32(sym_pos.y+wavy_offset),0}
-		command.scale_factors=f32(scale_multiplier)
-		command.colors=la.array_cast(color,f32)
-		sym_pos.x+=spacing*f16(font.symbol_size.x)
-		for _ in 0..<QUAD_VERTS do append_soa_elem(commands,command) }}
+// _render_text::proc(args:..any,sep:string="",pos:[2]f16={0,0},color:[4]f16=WHITE,scale_multiplier:f16=1.0,pivot:bit_set[Compass]={},font_name:string="font-medium",shadow:bool=true,spacing:f16=1.0,waviness:f16=0.0) {
+// 	_,commands,_,_:=map_entry(&state.text_draw_commands,font_name)
+// 	if cap(commands)==0 do commands^=make_soa_dynamic_array_len_cap(#soa[dynamic]Text_Draw_Command,length=0,capacity=TEXT_COMMANDS_CAP)
+// 	text:=fmt.aprint(..args,sep=sep)
+// 	pos:=pos
+// 	font:=&state.fonts[font_name]; if font==nil do return
+// 	width:f16=f16(len(text))*f16(font.symbol_size.x)*spacing
+// 	height:f16=f16(font.symbol_size.y)
+// 	pos=pos-0.5*{width,height}+0.5*la.array_cast(font.symbol_size,f16)
+// 	if .EAST in pivot { pos.x-=0.5*width }
+// 	if .WEST in pivot { pos.x+=0.5*width }
+// 	if .NORTH in pivot { pos.y-=0.5*height }
+// 	if .SOUTH in pivot { pos.y+=0.5*height }
+// 	use_shader(state.font_shader)
+// 	set_shader_param(state.font_shader.this_buffer_res,la.array_cast(state.resolution,f32))
+// 	set_shader_param(state.font_shader.symbol_size,[2]f32{f32(font.symbol_size.x),f32(font.symbol_size.y)})
+// 	sym_pos:[2]f16=pos
+// 	for c,i in text {
+// 		command:Text_Draw_Command
+// 		command.symbols=f32(c)
+// 		wavy_offset:f16=waviness*f16(math.sin(3.12*state.net_time+f32(i))+math.cos(7.31*state.net_time+f32(i)))
+// 		command.positions=[3]f32{f32(sym_pos.x),f32(sym_pos.y+wavy_offset),0}
+// 		command.scale_factors=f32(scale_multiplier)
+// 		command.colors=la.array_cast(color,f32)
+// 		sym_pos.x+=spacing*f16(font.symbol_size.x)
+// 		for _ in 0..<QUAD_VERTS do append_soa_elem(commands,command) }}
 glfw_error_callback::proc"c"(error:i32,description:cstring) {
 	context=runtime.default_context()
 	fmt.println("glfw error",error,description) }
@@ -383,20 +376,19 @@ init_draw::proc() {
 	init_shaders()
 	init_fontstash()
 	use_shader(state.texture_shader)
-	state.default_sb=make_render_buffer_static(state.window_size,1,{gl.RGBA8},{gl.RGBA}); assert(state.default_sb!=nil)
-	state.bloom_sb=make_render_buffer_static(state.window_size,1,{gl.RGBA8},{gl.RGBA}); assert(state.bloom_sb!=nil) }
+	init_render_buffer(&state.default_sb,state.window_size,gl.RGBA8,gl.RGBA)
+	init_render_buffer(&state.bloom_sb,state.window_size,gl.RGBA8,gl.RGBA) }
 destroy_renderer::proc() {
-	delete_render_buffer(state.default_sb)
-	delete_render_buffer(state.bloom_sb)
+	delete_render_buffer(&state.default_sb)
+	delete_render_buffer(&state.bloom_sb)
 	glfw.DestroyWindow(state.window)
 	glfw.Terminate() }
 draw_tick::proc() {
-	set_blend(true)
 	state.texture_draw_commands=make_map_cap(map[string]#soa[dynamic]Texture_Draw_Command,capacity=TEXTURE_GROUPS_CAP,allocator=context.allocator)
 	state.text_draw_commands=make_map_cap(map[string]#soa[dynamic]Text_Draw_Command,capacity=TEXT_GROUPS_CAP,allocator=context.allocator)
 	clear_frame_buffer(0)
-	clear_render_buffer(state.default_sb)
-	select_render_buffer(state.default_sb)
+	clear_render_buffer(&state.default_sb)
+	select_render_buffer(&state.default_sb)
 	use_shader(state.texture_shader)
 	set_shader_param(state.texture_shader.time,f32(state.net_time))
 	set_shader_param(state.texture_shader.view_matrix,&state.view_matrix)
@@ -405,13 +397,13 @@ draw_tick::proc() {
 	case .GAME: render_board()
 	case .MENU: render_menu() }
 	render_texture_groups()
-	select_render_buffer(state.bloom_sb)
-	render_bloom_threshold(state.default_sb)
-	render_blur(state.bloom_sb,1)
-	render_blur(state.bloom_sb,2)
-	render_blur(state.bloom_sb,4)
+	select_render_buffer(&state.bloom_sb)
+	render_bloom_threshold(&state.default_sb)
+	render_blur(&state.bloom_sb,1)
+	render_blur(&state.bloom_sb,2)
+	render_blur(&state.bloom_sb,4)
 	select_frame_buffer(0)
-	render_bloom(state.default_sb,state.bloom_sb)
+	render_bloom(&state.default_sb,&state.bloom_sb)
 	for name,_ in state.text_draw_commands do render_text_group(name)
 	swap_buffers() }
 get_windowed_mode_resolution::proc()->[2]u16 {

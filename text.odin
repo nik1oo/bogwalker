@@ -17,10 +17,10 @@ init_fontstash::proc() {
 	// goudy-bookletter-1911
 	// metamorphous
 	// inknut-antiqua
-	font_alegreya:=fs.AddFontPath(&font_context,"alegreya","fonts/labrada.ttf")
+	font_alegreya:=fs.AddFontPath(&font_context,"alegreya","fonts/goudy-bookletter-1911.ttf")
 	font_arial:=fs.AddFontPath(&font_context,"arial","fonts/arial.ttf")
 	fs.SetFont(&font_context,font_alegreya)
-	fs.SetSize(&font_context,44)
+	fs.SetSize(&font_context,32)
 	fs.SetAH(&font_context,.LEFT)
 	fs.SetAV(&font_context,.MIDDLE)
 	fs.SetSpacing(&font_context,8)
@@ -53,7 +53,13 @@ text_rect::proc(text:string,pos:[2]f16)->Rect(f16){
 	o_quad:=state.glyph_infos['O'].quad
 	pos1.y=pos0.y+cast(f16)(o_quad.y0-o_quad.y1)
 	return {pos={(pos0.x+pos1.x)/2,(pos0.y+pos1.y)/2},size=pos1-pos0} }
-render_text::proc(text:string,pos:[2]f16,color:[3]f32={1,1,1},pivot:bit_set[Compass]={}) {
+render_text::proc(args:..any,sep:string="",pos:[2]f16={0,0},color:[4]f16=WHITE,pivot:bit_set[Compass]={}) {
+	text:=fmt.aprint(..args,sep=sep)
+	_render_text(text,pos,color,pivot) }
+render_textf::proc(format:string,args:..any,pos:[2]f16={0,0},color:[4]f16=WHITE,pivot:bit_set[Compass]={}) {
+	text:=fmt.aprintf(format,..args)
+	_render_text(text,pos,color,pivot) }
+_render_text::proc(text:string,pos:[2]f16,color:[4]f16=WHITE,pivot:bit_set[Compass]={}) {
 	pos:=pos
 	render_point(pos,3,{1,0,0},depth=0.0)
 	rect:Rect(f16)=text_rect(text,pos)
@@ -68,12 +74,12 @@ render_text::proc(text:string,pos:[2]f16,color:[3]f32={1,1,1},pivot:bit_set[Comp
 		if c!=' ' do render_glyph(c,quad,color,pos-{cast(f16)glyph.xoff,cast(f16)glyph.yoff})
 		else do quad=state.glyph_infos['_'].quad
 		pos.x+=cast(f16)(quad.x1-quad.x0) } }
-render_glyph::proc(glyph:rune,quad:fs.Quad,color:[3]f32,pos:[2]f16) {
+render_glyph::proc(glyph:rune,quad:fs.Quad,color:[4]f16,pos:[2]f16) {
 	gl.UseProgram(state.glyph_shader.handle)
 	set_shader_param(state.glyph_shader.pos,la.array_cast(pos,f32))
 	set_shader_param(state.glyph_shader.size,[2]f32{cast(f32)(quad.x1-quad.x0),cast(f32)(quad.y1-quad.y0)})
 	set_shader_param(state.glyph_shader.resolution,la.array_cast(state.resolution,f32))
-	set_shader_param(state.glyph_shader.fill_color,color)
+	set_shader_param(state.glyph_shader.fill_color,la.array_cast(color,f32))
 	set_shader_param(state.glyph_shader.s0,quad.s0)
 	set_shader_param(state.glyph_shader.s1,quad.s1)
 	set_shader_param(state.glyph_shader.t0,quad.t0)

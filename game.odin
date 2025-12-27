@@ -323,12 +323,11 @@ render_menu::proc() {
 	if (submenu^==.DISPLAY)||(submenu^==.NONE) do render_cell(name=DISPLAY_NAME,i=f16(display_i),j=f16(menu_j+drag),layer=LAYER_ABOVE_SURFACE,flags={.WINDY})
 	if (submenu^==.AUDIO)||(submenu^==.NONE) do render_cell(name=AUDIO_NAME,i=f16(audio_i),j=f16(menu_j+drag),layer=LAYER_ABOVE_SURFACE,flags={.WINDY})
 	if (submenu^==.EXIT)||(submenu^==.NONE) do render_cell(name=EXIT_NAME,i=f16(exit_i),j=f16(menu_j+drag),layer=LAYER_ABOVE_SURFACE,flags={.WINDY})
-	set_blend(true)
 	render_texture(name="title-0",rect={{0,280+8*f16(math.sin(state.net_time*4))+40*f16(math.pow(math.sin(state.net_time),16.0))},5*{256,82}},depth=LAYER_ABOVE_SURFACE)
 	render_texture(name="title-1",rect={{0,200+8*f16(math.sin(state.net_time*4))+20*f16(math.pow(math.sin(state.net_time),16.0))},5*{256,82}},depth=LAYER_ABOVE_SURFACE)
-	_render_text("BOGWALKER",pos={0,0},color=WHITE,font_name="font-title",waviness=2.0,spacing=state.view_scale*1.2,scale_multiplier=state.view_scale*1.5+0.02*(f16(math.sin(3.12*state.net_time))+f16(math.cos(7.31*state.net_time))))
+	render_text("BOGWALKER",pos={0,0},color=WHITE)
 	t:f16=min(8*f16(state.net_time-state.hover_time),1)
-	if slice.contains([]string{START_NAME,DISPLAY_NAME,AUDIO_NAME,EXIT_NAME},state.hovered_name)&&(submenu^==.NONE) do _render_text(state.hovered_name,pos=project_pos(entity_pos(f16(state.hovered_pos.?.x),f16(state.hovered_pos.?.y)+0.70)),pivot={.SOUTH},font_name="font-medium",scale_multiplier=1.5+0.5*t,spacing=1+0.5*t)
+	if slice.contains([]string{START_NAME,DISPLAY_NAME,AUDIO_NAME,EXIT_NAME},state.hovered_name)&&(submenu^==.NONE) do render_text(state.hovered_name,pos=project_pos(entity_pos(f16(state.hovered_pos.?.x),f16(state.hovered_pos.?.y)+0.70)),pivot={.SOUTH})
 	#partial switch submenu^ {
 	case .START:
 		select:=math.round(drag)
@@ -338,22 +337,22 @@ render_menu::proc() {
 		t4:f16=clamp(1-abs(state.control_state.drag-(-3)),0,1)
 		render_whiteline(i=start_i,j0=menu_j-3,j1=menu_j)
 		text_pos:[2]f16=entity_pos(start_i+1,menu_j-0)
-		_render_text("beginner",pos=project_pos(text_pos),color={1,1,(select==0)?0:1,1},pivot={.WEST},font_name="font-medium",scale_multiplier=math.lerp(f16(1.5),f16(2.0),t1),spacing=1+t1)
+		render_text("beginner",pos=project_pos(text_pos),color={1,1,(select==0)?0:1,1},pivot={.WEST})
 		text_pos=entity_pos(start_i+1,menu_j-1)
-		_render_text("easy",pos=project_pos(text_pos),color={1,1,(select==-1)?0:1,1},pivot={.WEST},font_name="font-medium",scale_multiplier=math.lerp(f16(1.5),f16(2.0),t2),spacing=1+t2)
+		render_text("easy",pos=project_pos(text_pos),color={1,1,(select==-1)?0:1,1},pivot={.WEST})
 		text_pos=entity_pos(start_i+1,menu_j-2)
-		_render_text("medium",pos=project_pos(text_pos),color={1,1,(select==-2)?0:1,1},pivot={.WEST},font_name="font-medium",scale_multiplier=math.lerp(f16(1.5),f16(2.0),t3),spacing=1+t3)
+		render_text("medium",pos=project_pos(text_pos),color={1,1,(select==-2)?0:1,1},pivot={.WEST})
 		text_pos=entity_pos(start_i+1,menu_j-3)
-		_render_text("hard",pos=project_pos(text_pos),color={1,1,(select==-3)?0:1,1},pivot={.WEST},font_name="font-medium",scale_multiplier=math.lerp(f16(1.5),f16(2.0),t4),spacing=1+t4)
+		render_text("hard",pos=project_pos(text_pos),color={1,1,(select==-3)?0:1,1},pivot={.WEST})
 	case .DISPLAY:
 		select:=drag+((state.settings.display==.WINDOWED)?0:-1)
 		t1:f16=clamp(1-abs(state.control_state.drag+((state.settings.display==.WINDOWED)?0:-1)-(-0)),0,1)
 		t2:f16=clamp(1-abs(state.control_state.drag+((state.settings.display==.WINDOWED)?0:-1)-(-1)),0,1)
 		render_whiteline(i=display_i,j0=menu_j+((state.settings.display==.WINDOWED)?-1:0),j1=menu_j+((state.settings.display==.WINDOWED)?0:1))
 		text_pos:[2]f16=entity_pos(display_i+1,menu_j+((state.settings.display==.WINDOWED)?0:1))
-		_render_text("windowed",pos=project_pos(text_pos),color={1,1,(math.round(select)==0)?0:1,1},pivot={.WEST},font_name="font-medium",scale_multiplier=math.lerp(f16(1.5),f16(2.0),t1),spacing=1+t1)
+		render_text("windowed",pos=project_pos(text_pos),color={1,1,(math.round(select)==0)?0:1,1},pivot={.WEST})
 		text_pos=entity_pos(display_i+1,menu_j+((state.settings.display==.WINDOWED)?(-1):0))
-		_render_text("fullscreen",pos=project_pos(text_pos),color={1,1,(math.round(select)==-1)?0:1,1},pivot={.WEST},font_name="font-medium",scale_multiplier=math.lerp(f16(1.5),f16(2.0),t2),spacing=1+t2)
+		render_text("fullscreen",pos=project_pos(text_pos),color={1,1,(math.round(select)==-1)?0:1,1},pivot={.WEST})
 	case .AUDIO:
 		select:=min(max(state.settings.audio-(-state.control_state.drag/3),0),1)
 		t1:=clamp(select,0,1)
@@ -361,9 +360,9 @@ render_menu::proc() {
 		// state.settings.audio=min(max(select,0),1)
 		render_whiteline(i=audio_i,j0=menu_j-3+3-state.settings.audio*3,j1=menu_j+3-state.settings.audio*3)
 		text_pos:[2]f16=entity_pos(audio_i+1,menu_j-0+3-state.settings.audio*3)
-		_render_text("100%",pos=project_pos(text_pos),color=WHITE,pivot={.WEST},font_name="font-medium",scale_multiplier=math.lerp(f16(1.5),f16(2.0),t1),spacing=1+t1)
+		render_text("100%",pos=project_pos(text_pos),color=WHITE,pivot={.WEST})
 		text_pos=entity_pos(audio_i+1,menu_j-3+3-state.settings.audio*3)
-		_render_text("  0%",pos=project_pos(text_pos),color=WHITE,pivot={.WEST},font_name="font-medium",scale_multiplier=math.lerp(f16(1.5),f16(2.0),t2),spacing=1+t2)
+		render_text("  0%",pos=project_pos(text_pos),color=WHITE,pivot={.WEST})
 		state.flags+={.AUDIO_MENU_DRAWN}
 	case .EXIT:
 		select:=math.round(drag)
@@ -371,9 +370,9 @@ render_menu::proc() {
 		t2:f16=clamp(1-abs(state.control_state.drag-(-1)),0,1)
 		render_whiteline(i=exit_i,j0=menu_j-1,j1=menu_j)
 		text_pos:[2]f16=entity_pos(exit_i+1,menu_j-0)
-		_render_text("no",pos=project_pos(text_pos),color={1,1,(select==0)?0:1,1},pivot={.WEST},font_name="font-medium",scale_multiplier=math.lerp(f16(1.5),f16(2.0),t1),spacing=1+t1)
+		render_text("no",pos=project_pos(text_pos),color={1,1,(select==0)?0:1,1},pivot={.WEST})
 		text_pos=entity_pos(exit_i+1,menu_j-1)
-		_render_text("yes",pos=project_pos(text_pos),color={1,1,(select==-1)?0:1,1},pivot={.WEST},font_name="font-medium",scale_multiplier=math.lerp(f16(1.5),f16(2.0),t2),spacing=1+t2)
+		render_text("yes",pos=project_pos(text_pos),color={1,1,(select==-1)?0:1,1},pivot={.WEST})
 	case:
 		state.flags-={.AUDIO_MENU_DRAWN} }}
 project_pos::proc(pos:[2]f16)->[2]f16 {
@@ -427,37 +426,35 @@ render_board::proc() {
 	if board.last_click!=nil {
 		hero_pos:=board.last_click.([2]i8)
 		render_entity({ kind=.HERO },hero_pos.x,hero_pos.y) }
-	set_blend(true)
 	board_iterator(&i,&j)
 	for iterate_board(board,&i,&j) {
 		threat:=board.threats[i][j]
 		ep:=entity_pos(f16(i),f16(j))
 		tp:[3]f32=state.view_matrix*[3]f32{f32(ep.x),f32(ep.y),1}
 		// TEMP
-		if (threat!=0)/*&&(!cell_occupied(board,i,j))*//*&&(board.vision[i][j])*/ do _render_text(fmt.aprint(threat),pos={f16(tp.x),f16(tp.y)},color=WHITE,spacing=0.5,font_name="font-medium",scale_multiplier=1.25+0.75*max(1-f16(la.length(state.cursor-[2]f32{tp.x,tp.y}))/(250*f16(state.view_zoom)),0.0))
-		}
-	render_text("Bogwalker",color={1,1,1},pos={0,0},pivot={.NORTH})
+		if (threat!=0)/*&&(!cell_occupied(board,i,j))*//*&&(board.vision[i][j])*/ do render_text(fmt.aprint(threat),pos={f16(tp.x),f16(tp.y)},color=WHITE) }
+	// render_text("Bogwalker",color={1,1,1},pos={0,0},pivot={.NORTH})
 	text_pos:=[2]f16{0,-0.5*f16(state.window_size.y)+8}
 	text_pos={-0.5*f16(state.window_size.x)+8,-0.5*f16(state.window_size.y)+8}
-	_render_text("ESC give up",pos=text_pos,pivot={.WEST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
-	_render_text("R   restart",pos=text_pos,pivot={.WEST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
-	_render_text("F   mark croc",pos=text_pos,pivot={.WEST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
-	_render_text("\"   reveal",pos=text_pos,pivot={.WEST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
-	_render_text("#   look",pos=text_pos,pivot={.WEST,.SOUTH},font_name="font-medium",scale_multiplier=1.5)
+	render_text("ESC give up",pos=text_pos,pivot={.WEST,.SOUTH}); text_pos.y+=24
+	render_text("R   restart",pos=text_pos,pivot={.WEST,.SOUTH}); text_pos.y+=24
+	render_text("F   mark croc",pos=text_pos,pivot={.WEST,.SOUTH}); text_pos.y+=24
+	render_text("\"   reveal",pos=text_pos,pivot={.WEST,.SOUTH}); text_pos.y+=24
+	render_text("#   look",pos=text_pos,pivot={.WEST,.SOUTH})
 	text_pos={0.5*f16(state.window_size.x)-8,-0.5*f16(state.window_size.y)+8}
-	_render_text("hide entities   E",pos=text_pos,pivot={.EAST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
-	_render_text("reveal board   W",pos=text_pos,pivot={.EAST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
-	_render_text("hide board   Q",pos=text_pos,pivot={.EAST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
+	render_text("hide entities   E",pos=text_pos,pivot={.EAST,.SOUTH}); text_pos.y+=24
+	render_text("reveal board   W",pos=text_pos,pivot={.EAST,.SOUTH}); text_pos.y+=24
+	render_text("hide board   Q",pos=text_pos,pivot={.EAST,.SOUTH}); text_pos.y+=24
 	text_pos={-0.5*f16(state.window_size.x)+8,0.5*f16(state.window_size.y)-8}
-	_render_text("remaining monsters: ",fmt.aprint(len(board.entities)-int(board.n_flags)),pos=text_pos,pivot={.WEST,.NORTH},font_name="font-medium",scale_multiplier=1.5)
+	render_text("remaining monsters: ",fmt.aprint(len(board.entities)-int(board.n_flags)),pos=text_pos,pivot={.WEST,.NORTH})
 	text_pos={0.5*f16(state.window_size.x)-8,0.5*f16(state.window_size.y)-8}
-	_render_text(fmt.aprintf("time: %.2f",state.play_time),pos=text_pos,pivot={.EAST,.NORTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y-=24
-	if state.highscores[int(board.difficulty)]!=math.F32_MAX do _render_text(fmt.aprintf("highscore: %.2f",state.highscores[int(board.difficulty)]),pos=text_pos,pivot={.EAST,.NORTH},font_name="font-medium",scale_multiplier=1.5)
+	render_text(fmt.aprintf("time: %.2f",state.play_time),pos=text_pos,pivot={.EAST,.NORTH}); text_pos.y-=24
+	if state.highscores[int(board.difficulty)]!=math.F32_MAX do render_text(fmt.aprintf("highscore: %.2f",state.highscores[int(board.difficulty)]),pos=text_pos,pivot={.EAST,.NORTH})
 	text_pos={0,f16(state.resolution.y/2)-48}
 	if .VICTORIOUS in state.flags {
-		_render_text("WINNER",pos=text_pos,color=WHITE,font_name="font-title",waviness=2.0,spacing=0.8)
-		if .HIGHSCORE_SET in state.flags do _render_text("new highscore!",pos=text_pos+{0,-f16(state.resolution.y)+96},font_name="font-title",waviness=2.0,spacing=0.6) }
-	if .DEAD in state.flags do _render_text("LOSER",pos=text_pos,color=WHITE,font_name="font-title",waviness=2.0,spacing=0.8)
+		render_text("WINNER",pos=text_pos,color=WHITE)
+		if .HIGHSCORE_SET in state.flags do render_text("new highscore!",pos=text_pos+{0,-f16(state.resolution.y)+96}) }
+	if .DEAD in state.flags do render_text("LOSER",pos=text_pos,color=WHITE)
 	pos:=[2]f16{0,-0.5*f16(state.window_size.y)+8+TILE_SIZE/2}
 	pos.x-=0.5*len(Entity_Kind)*1.2*TILE_SIZE
 	for i in 1..<len(Entity_Kind) {
@@ -471,7 +468,7 @@ render_board::proc() {
 		if mouse_was_pressed(.MOUSE_LEFT)&&hovered do state.marker_kind=entity_kind
 		// polygon_mode(gl.FILL)
 		pos.x+=1.2*TILE_SIZE
-		// _render_text("ESC give up",pos=text_pos,pivot={.WEST,.SOUTH},font_name="font-medium",scale_multiplier=1.5); text_pos.y+=24
+		// render_text("ESC give up",pos=text_pos,pivot={.WEST,.SOUTH}); text_pos.y+=24
 	}
 }
 board_tick::proc() {

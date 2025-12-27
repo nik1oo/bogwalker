@@ -122,6 +122,7 @@ State::struct {
 	bloom_threshold_shader:^Bloom_Threshold_Shader,
 	bloom_shader:^Bloom_Shader,
 	blur_shader:^Blur_Shader,
+	outline_shader:^Outline_Shader,
 	blend_shader:^Blend_Shader,
 	font_shader:^Font_Shader,
 	rect_shader:^Rect_Shader,
@@ -139,8 +140,9 @@ State::struct {
 	play_time:f32,
 	frame_time:f32,
 	hover_time:f32,
-	default_sb:^Render_Buffer,
-	bloom_sb:^Render_Buffer }
+	// (TODO): Make an "icons_and_text" render buffer and apply an outline to it.
+	default_sb:Render_Buffer,
+	bloom_sb:Render_Buffer }
 Texture_Draw_Command::struct {
 	pos:[2]f32,
 	size:[2]f32,
@@ -195,12 +197,11 @@ Sound::struct {
 Render_Buffer::struct {
 	initialized:bool,
 	frame_buffer_handle:u32,
-	texture_handles:[]u32,
-	texture_formats:[]u32,
-	texture_internal_formats:[]i32,
+	texture_handle:u32,
+	texture_format:u32,
+	texture_internal_format:i32,
 	render_buffer_handle:u32,
-	size:[2]u16,
-	n_frames:i16 }
+	size:[2]u16 }
 Shader::struct {
 	name:string,
 	handle:u32,
@@ -226,6 +227,9 @@ Bloom_Shader::struct {
 Blur_Shader::struct {
 	using shader:Shader,
 	resolution,step:i32 }
+Outline_Shader::struct {
+	using shader:Shader,
+	resolution,size:i32 }
 Blend_Shader::struct {
 	using shader:Shader }
 Glyph_Shader::struct {
