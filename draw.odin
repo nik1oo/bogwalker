@@ -65,6 +65,9 @@ polygon_mode::proc(mode:u32) {
 	gl.PolygonMode(gl.FRONT_AND_BACK,mode) }
 select_render_buffer::proc(render_buffer:^Render_Buffer) {
 	state.current_render_buffer=render_buffer
+	if render_buffer==nil {
+		select_frame_buffer(0)
+		return }
 	gl.BindFramebuffer(gl.FRAMEBUFFER,u32(render_buffer.frame_buffer_handle))
 	gl.Viewport(0,0,i32(state.resolution.x),i32(state.resolution.y)) }
 clear_render_buffer::proc(render_buffer:^Render_Buffer,color:[4]f16) {
@@ -227,9 +230,10 @@ render_outline::proc(render_buffer:^Render_Buffer,stroke_color:[4]f16,size:u8) {
 	set_shader_param(state.outline_shader.stroke_color,la.array_cast(stroke_color,f32))
 	bind_texture(0,render_buffer.texture_handle)
 	draw_triangles(6,depth_test=false) }
-render_render_buffer::proc(render_buffer:^Render_Buffer) {
+render_render_buffer::proc(render_buffer:^Render_Buffer,alpha:f16=1.0) {
 	use_shader(state.buffer_shader)
 	bind_texture(0,render_buffer.texture_handle)
+	set_shader_param(state.buffer_shader.alpha,f32(alpha))
 	draw_triangles(6,depth_test=false) }
 render_rect::proc(rect:Rect(f16),color:[4]f32,rounding:f32,depth:f32) {
 	use_shader(state.rect_shader)
@@ -240,6 +244,16 @@ render_rect::proc(rect:Rect(f16),color:[4]f32,rounding:f32,depth:f32) {
 	set_shader_param(state.rect_shader.rounding,rounding)
 	set_shader_param(state.rect_shader.depth,depth)
 	draw_triangles(6,depth_test=true) }
+// DICK
+// render_tile::proc(name:string,rect:Rect(f16),depth:f32) {
+// 	use_shader(state.rect_shader)
+// 	set_shader_param(state.rect_shader.resolution,la.array_cast(state.resolution,f32))
+// 	set_shader_param(state.rect_shader.pos,la.array_cast(rect.pos,f32))
+// 	set_shader_param(state.rect_shader.size,la.array_cast(rect.size,f32))
+// 	set_shader_param(state.rect_shader.fill_color,color)
+// 	set_shader_param(state.rect_shader.rounding,rounding)
+// 	set_shader_param(state.rect_shader.depth,depth)
+// 	draw_triangles(6,depth_test=true) }
 render_point::proc(pos:[2]f16,size:f16,color:[3]f32,depth:f32) {
 	gl.UseProgram(state.point_shader.handle)
 	gl.PointSize(auto_cast size)
@@ -255,6 +269,19 @@ render_bloom::proc(base_render_buffer:^Render_Buffer,bloom_render_buffer:^Render
 	bind_texture(0,base_render_buffer.texture_handle)
 	bind_texture(1,bloom_render_buffer.texture_handle)
 	draw_triangles(6,depth_test=false) }
+render_shadow::proc(foreground_render_buffer:^Render_Buffer,background_render_buffer:^Render_Buffer,length:u8,blur:u8,opacity:f16) {
+	prev_render_buffer:=state.current_render_buffer
+	defer select_render_buffer(prev_render_buffer)
+	select_render_buffer(&state.scratch_render_buffer)
+	use_shader(state.shadow_shader)
+	set_shader_param(state.shadow_shader.resolution,la.array_cast(state.resolution,f32))
+	set_shader_param(state.shadow_shader.length,i32(length))
+	set_shader_param(state.shadow_shader.opacity,1.0)
+	bind_texture(0,foreground_render_buffer.texture_handle)
+	draw_triangles(6,depth_test=false)
+	for i in 0..<blur do render_blur(&state.scratch_render_buffer,auto_cast math.pow_f32(2,auto_cast i))
+	select_render_buffer(background_render_buffer)
+	render_render_buffer(&state.scratch_render_buffer,alpha=opacity) }
 init_shader_params::proc($Type:typeid,shader:^Type) {
 	field_names:=reflect.struct_field_names(Type)
 	field_offsets:=reflect.struct_field_offsets(Type)
@@ -290,6 +317,7 @@ init_shaders::proc() {
 	state.rect_shader=init_shader("rect",Rect_Shader,"./shaders/vrect.glsl","./shaders/frect.glsl")
 	state.glyph_shader=init_shader("glyph",Glyph_Shader,"./shaders/vglyph.glsl","./shaders/fglyph.glsl")
 	state.point_shader=init_shader("point",Point_Shader,"./shaders/vpoint.glsl","./shaders/fpoint.glsl")
+	state.shadow_shader=init_shader("shadow",Shadow_Shader,"./shaders/vfill.glsl","./shaders/fshadow.glsl")
 	use_shader(state.texture_shader)
 	set_shader_param(state.texture_shader.resolution,la.array_cast(state.resolution,f32)) }
 print_glsl_error::proc(message:string,message_type:gl.Shader_Type,shader:^Shader,vert_string:string,frag_string:string) {
@@ -386,11 +414,13 @@ init_draw::proc() {
 	use_shader(state.texture_shader)
 	init_render_buffer(&state.default_render_buffer,state.window_size,gl.RGBA8,gl.RGBA)
 	init_render_buffer(&state.bloom_render_buffer,state.window_size,gl.RGBA8,gl.RGBA)
-	init_render_buffer(&state.icons_and_text_render_buffer,state.window_size,gl.RGBA8,gl.RGBA) }
+	init_render_buffer(&state.icons_and_text_render_buffer,state.window_size,gl.RGBA8,gl.RGBA)
+	init_render_buffer(&state.scratch_render_buffer,state.window_size,gl.RGBA8,gl.RGBA) }
 destroy_renderer::proc() {
 	delete_render_buffer(&state.default_render_buffer)
 	delete_render_buffer(&state.bloom_render_buffer)
 	delete_render_buffer(&state.icons_and_text_render_buffer)
+	delete_render_buffer(&state.scratch_render_buffer)
 	glfw.DestroyWindow(state.window)
 	glfw.Terminate() }
 draw_tick::proc() {
@@ -398,8 +428,9 @@ draw_tick::proc() {
 	state.text_draw_commands=make_map_cap(map[string]#soa[dynamic]Text_Draw_Command,capacity=TEXT_GROUPS_CAP,allocator=context.allocator)
 	clear_frame_buffer(0)
 	gl.ClearColor(0,0,0,1)
-	clear_render_buffer(&state.default_render_buffer,BLACK)
+	clear_render_buffer(&state.default_render_buffer,GRAY)
 	clear_render_buffer(&state.icons_and_text_render_buffer,TRANSPARENT)
+	clear_render_buffer(&state.scratch_render_buffer,TRANSPARENT)
 	select_render_buffer(&state.default_render_buffer)
 	use_shader(state.texture_shader)
 	set_shader_param(state.texture_shader.time,f32(state.net_time))
@@ -417,7 +448,10 @@ draw_tick::proc() {
 	select_frame_buffer(0)
 	render_bloom(&state.default_render_buffer,&state.bloom_render_buffer)
 	select_render_buffer(&state.icons_and_text_render_buffer)
-	render_outline(&state.icons_and_text_render_buffer,BLACK,2)
+	render_outline(&state.icons_and_text_render_buffer,BLACK,1)
+	// DICK
+	render_shadow(&state.icons_and_text_render_buffer,nil,2,2,0.3)
+	// render_blur(&state.icons_and_text_render_buffer,1)
 	select_frame_buffer(0)
 	render_render_buffer(&state.icons_and_text_render_buffer)
 	for name,_ in state.text_draw_commands do render_text_group(name)

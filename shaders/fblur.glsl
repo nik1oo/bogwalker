@@ -11,10 +11,9 @@ float gaus(float x,float y,float r) {
 	float ry=y/r;
 	return pow(2.0,(-rx*rx-ry*ry)); }
 void main(void) {
-	// color=texture(samp,tex_coord); return; // TEMP
 	vec2 step_size=vec2(step)/resolution.xy;
-	color=vec4(0,0,0,1);
+	color=vec4(0,0,0,0);
 	for(float i=0; i<STEPS; i+=1) {
 		for(float j=0; j<STEPS; j+=1) {
-			color.xyz+=texture(samp,tex_coord+(vec2(i,j)-vec2(STEPS-1)/2)*step_size).xyz; }}
-	color.xyz/=10; }
+			color+=texture(samp,tex_coord+(vec2(i,j)-vec2(STEPS-1)/2)*step_size); }}
+	color/=10; }

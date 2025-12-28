@@ -14,6 +14,7 @@ BOUNDED_RUNTIME::#config(BOUNDED_RUNTIME,false)
 TRANSPARENT:[4]f16:{0,0,0,0}
 BLACK:[4]f16:{0,0,0,1}
 WHITE:[4]f16:{1,1,1,1}
+GRAY:[4]f16:{0.5,0.5,0.5,1}
 YELLOW:[4]f16:{1,1,0,1}
 RED:[4]f16:{1,0,0,1}
 GREEN:[4]f16:{0,1,0,1}
@@ -123,6 +124,7 @@ State::struct {
 	bloom_threshold_shader:^Bloom_Threshold_Shader,
 	bloom_shader:^Bloom_Shader,
 	blur_shader:^Blur_Shader,
+	shadow_shader:^Shadow_Shader,
 	outline_shader:^Outline_Shader,
 	blend_shader:^Blend_Shader,
 	font_shader:^Font_Shader,
@@ -144,6 +146,7 @@ State::struct {
 	default_render_buffer:Render_Buffer,
 	bloom_render_buffer:Render_Buffer,
 	icons_and_text_render_buffer:Render_Buffer,
+	scratch_render_buffer:Render_Buffer,
 	current_render_buffer:^Render_Buffer }
 Texture_Draw_Command::struct {
 	pos:[2]f32,
@@ -220,7 +223,8 @@ Texture_Shader::struct {
 	using shader:Shader,
 	pos,size,rotation,resolution,depth,time,flip_y,lightness,view_matrix,view_zoom,rotation_matrix,waves,caustics,windy:i32 }
 Buffer_Shader::struct {
-	using shader:Shader }
+	using shader:Shader,
+	alpha:i32 }
 Bloom_Threshold_Shader::struct {
 	using shader:Shader }
 Bloom_Shader::struct {
@@ -229,6 +233,9 @@ Bloom_Shader::struct {
 Blur_Shader::struct {
 	using shader:Shader,
 	resolution,step:i32 }
+Shadow_Shader::struct {
+	using shader:Shader,
+	resolution,length,opacity:i32 }
 Outline_Shader::struct {
 	using shader:Shader,
 	resolution,size,stroke_color:i32 }
@@ -333,6 +340,20 @@ init_assets::proc() {
 	load_texture_from_filepath("./images/rihtul.png")
 	load_texture_from_filepath("./images/trul.png")
 	load_texture_from_filepath("./images/hero.png")
+	load_texture_from_filepath("./images/noise-1.png")
+	load_texture_from_filepath("./images/noise-2.png")
+	load_texture_from_filepath("./images/noise-3.png")
+	load_texture_from_filepath("./images/noise-4.png")
+	load_texture_from_filepath("./images/noise-5.png")
+	load_texture_from_filepath("./images/noise-6.png")
+	load_texture_from_filepath("./images/noise-7.png")
+	load_texture_from_filepath("./images/noise-8.png")
+	load_texture_from_filepath("./images/noise-9.png")
+	load_texture_from_filepath("./images/noise-10.png")
+	load_texture_from_filepath("./images/noise-11.png")
+	load_texture_from_filepath("./images/noise-12.png")
+	load_texture_from_filepath("./images/noise-13.png")
+	load_texture_from_filepath("./images/background-1.png")
 	load_font("./images/font.png")
 	load_font("./images/font-title.png")
 	load_font("./images/font-huge.png")

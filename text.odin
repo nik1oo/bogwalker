@@ -17,7 +17,7 @@ init_fontstash::proc() {
 	// goudy-bookletter-1911
 	// metamorphous
 	// inknut-antiqua
-	font_alegreya:=fs.AddFontPath(&font_context,"alegreya","fonts/goudy-bookletter-1911.ttf")
+	font_alegreya:=fs.AddFontPath(&font_context,"alegreya","fonts/labrada.ttf")
 	font_arial:=fs.AddFontPath(&font_context,"arial","fonts/arial.ttf")
 	fs.SetFont(&font_context,font_alegreya)
 	fs.SetSize(&font_context,32)

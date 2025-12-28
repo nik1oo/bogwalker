@@ -37,7 +37,7 @@ Trul (the giant archetype) -- Troll of the Tarn, a troll that has wondered down 
 
  * You are a mercenary in knight's armor, who carries trinkets and trophies given to him by the guild.
  * When you die, your trinkets and trophies are retreived by the guild and returned to the guild house.
- * Every run is a series of 4-5 puzzles, concluding with a boss puzzle (a dragon with a special ability).
+ * Every run is a series of 4-5 puzzles, concluding with a boss puzzle (a ruin with a dragon with a special ability).
  * When you complete a run, you clear a path towards the citadel.
  * When you die, the path you cleared is filled with monsters again, but a tombstone is left to denote how far you got.
  * When you reach the citadel, you get a golden trinket from the mage who lives in it, and the ability to make the game harder (ascension mode).
